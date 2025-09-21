@@ -11,6 +11,17 @@ const ABI = [
 
 let provider = null, signer = null, account = null, isConnected = false;
 
+function isMobileUA() {
+  const ua = navigator.userAgent || navigator.vendor || window.opera;
+  return /android|iphone|ipad|ipod/i.test(ua);
+}
+
+function openInMetaMaskApp() {
+  const dappPath = location.host + location.pathname + location.search + location.hash;
+  const mm = "https://metamask.app.link/dapp/" + dappPath.replace(/^https?:\/\//, "");
+  location.href = mm;
+}
+
 function setMintEnabled(enabled) { 
   const btn = document.getElementById("mint");
   if (!btn) return;
@@ -35,7 +46,7 @@ async function ensureNetwork() {
 }
 
 async function connectWallet() { 
-  if (!window.ethereum) { alert("Please install MetaMask"); return; } 
+  if (!window.ethereum) { if (isMobileUA()) { openInMetaMaskApp(); return; } alert("Please install MetaMask"); return; } 
   provider = new ethers.providers.Web3Provider(window.ethereum, "any"); 
   const [acc] = await provider.send("eth_requestAccounts", []); 
   signer = provider.getSigner(); 
@@ -58,7 +69,14 @@ async function connectWallet() {
 }
 
 function disconnectWallet() { provider = null; signer = null; account = null; isConnected = false; setMintEnabled(false); updateConnectButton(); }
-async function toggleConnect() { if (!isConnected) await connectWallet(); else disconnectWallet(); }
+async function toggleConnect() {
+  if (!isConnected) {
+    if (!window.ethereum && isMobileUA()) { openInMetaMaskApp(); return; }
+    await connectWallet();
+  } else {
+    disconnectWallet();
+  }
+}
 
 function getStyleAndSeed() { 
   const collection = document.getElementById("styleSelect")?.value || "rings"; 
