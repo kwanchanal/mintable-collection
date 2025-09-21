@@ -7,8 +7,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 
-/// @title mintable-collection (on-chain HTML)
-/// @notice ERC721 + EIP-2981 (royalty), payable mint (default 0.1 ETH), on-chain metadata+HTML
 contract MintableCollectionOnchain is ERC721, ERC2981, Ownable {
     using Strings for uint256;
 
@@ -22,14 +20,12 @@ contract MintableCollectionOnchain is ERC721, ERC2981, Ownable {
         ERC721("mintable-collection (on-chain)", "MINT")
         Ownable()
     {
-        _setDefaultRoyalty(royaltyReceiver, royaltyBps); // e.g., 1000 = 10%
+        _setDefaultRoyalty(royaltyReceiver, royaltyBps);
     }
 
-    // --- Admin ---
     function setMintPrice(uint256 weiPrice) external onlyOwner { mintPrice = weiPrice; }
     function withdraw(address payable to) external onlyOwner { to.transfer(address(this).balance); }
 
-    // --- Mint ---
     function mint(string memory collection, string memory seed) external payable returns (uint256) {
         require(msg.value >= mintPrice, "Price is 0.1 ETH");
         uint256 id = nextTokenId++;
@@ -38,7 +34,6 @@ contract MintableCollectionOnchain is ERC721, ERC2981, Ownable {
         return id;
     }
 
-    // --- Metadata ---
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_exists(tokenId), "nonexistent");
         Traits memory t = traits[tokenId];
@@ -59,7 +54,6 @@ contract MintableCollectionOnchain is ERC721, ERC2981, Ownable {
         return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
     }
 
-    // Minimal HTML + Canvas drawing with seeded PRNG (no external libs)
     function buildHTML(string memory collection, string memory seed) internal pure returns (string memory) {
         string memory head = "<!doctype html><html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>mintable-collection</title><style>html,body{margin:0;background:#111;color:#eee}canvas{display:block;width:100vw;height:100vh}</style><body><canvas id='c'></canvas><script>";
         string memory js1 =
@@ -71,7 +65,7 @@ contract MintableCollectionOnchain is ERC721, ERC2981, Ownable {
         "function resize(){a.width=innerWidth;a.height=innerHeight;draw()}window.onresize=resize;";
         string memory js2 =
         "function draw(){x.fillStyle='#121212';x.fillRect(0,0,a.width,a.height);if(collection==='rings')dr();else fl();}"
-        "function dr(){let pal=[[240,200,210,0.8],[120,155,135,0.8],[245,215,120,0.8],[202,122,92,0.8],[220,220,230,0.8]];let clusters=srange(3,6);for(let n=0;n<clusters;n++){let cx=srand(a.width*.1,a.width*.9),cy=srand(a.height*.1,a.height*.9),base=srand(Math.min(a.width,a.height)*.12,Math.min(a.width,a.height)*.24);for(let r=0;r<srange(8,15);r++){let c=pal[srange(0,pal.length)],den=srand(.035,.08),wob=srand(Math.min(a.width,a.height)*.012,Math.min(a.width,a.height)*.028);x.beginPath();for(let ang=0;ang<Math.PI*2;ang+=den){let nx=Math.cos(ang)*.7+r*.03,ny=Math.sin(ang)*.7+r*.03;let nf=(noise(nx,ny))*wob;let rad=base+r*srand(Math.min(a.width,a.height)*.009,Math.min(a.width,a.height)*.018)+nf;let px=cx+Math.cos(ang)*rad,py=cy+Math.sin(ang)*rad;if(ang===0)x.moveTo(px,py);else x.lineTo(px,py);}x.closePath();x.strokeStyle=`rgba(${c[0]},${c[1]},${c[2]},${c[3]})`;x.lineWidth=srand(.8,2.2);x.stroke();}}"
+        "function dr(){let pal=[[240,200,210,0.8],[120,155,135,0.8],[245,215,120,0.8],[202,122,92,0.8],[220,220,230,0.8]];let clusters=srange(3,6);for(let n=0;n<clusters;n++){let cx=srand(a.width*.1,a.width*.9),cy=srand(a.height*.1,a.height*.9),base=Math.min(a.width,a.height);base=srand(base*.12,base*.24);for(let r=0;r<srange(8,15);r++){let c=pal[srange(0,pal.length)],den=srand(.035,.08),wob=srand(Math.min(a.width,a.height)*.012,Math.min(a.width,a.height)*.028);x.beginPath();for(let ang=0;ang<Math.PI*2;ang+=den){let nx=Math.cos(ang)*.7+r*.03,ny=Math.sin(ang)*.7+r*.03;let nf=(noise(nx,ny))*wob;let rad=base+r*srand(Math.min(a.width,a.height)*.009,Math.min(a.width,a.height)*.018)+nf;let px=cx+Math.cos(ang)*rad,py=cy+Math.sin(ang)*rad;if(ang===0)x.moveTo(px,py);else x.lineTo(px,py);}x.closePath();x.strokeStyle=`rgba(${c[0]},${c[1]},${c[2]},${c[3]})`;x.lineWidth=srand(.8,2.2);x.stroke();}}}"
         "function fl(){x.strokeStyle='rgba(255,255,255,.8)';x.lineWidth=1;let lines=srange(40,80);for(let i=0;i<lines;i++){let y=srand(0,a.height);x.beginPath();for(let px=0;px<a.width;px+=Math.max(4,a.width/120)){let off=(noise(px*.01,y*.005,i*.1))*(a.width*.2)-(a.width*.1);if(px===0)x.moveTo(px,y+off);else x.lineTo(px,y+off);}x.stroke();}}"
         "function noise(x,y,z){function f(t){return t*t*(3-2*t)}function hash(n){let s=Math.sin(n)*43758.5453;return s-Math.floor(s)}"
         "let X=Math.floor(x),Y=Math.floor(y),Z=Math.floor(z||0);x-=X;y-=Y;z=(z||0)-Z;let u=f(x),v=f(y),w=f(z);"

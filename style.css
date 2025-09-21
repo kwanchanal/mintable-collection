@@ -1,11 +1,15 @@
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:#0f0f14;color:#e6e6ec;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace}
+html,body{margin:0;padding:0;background:#000000;color:#e6e6ec;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace}
 .panel{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:12px 16px;position:sticky;top:0;background:#13131a;border-bottom:1px solid #222;flex-wrap:wrap;z-index:10}
 .panel .left,.panel .right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .panel button{background:#222533;color:#e6e6ec;border:1px solid #333;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
 .panel button.disabled{opacity:.45;cursor:not-allowed;filter:grayscale(40%)}
 .panel input,.panel select{padding:8px 10px;border-radius:8px;border:1px solid #333;background:#181a24;color:#e6e6ec}
-button, input, select, textarea, option{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace!important}
+button,input,select,textarea,option{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace!important}
+.seedEcho{opacity:.8}
+#holder{display:flex;justify-content:center;padding:16px}
+
+
 
 /* Tooltip */
 .with-tip{position:relative;cursor:help;display:flex;align-items:center;gap:6px}
@@ -14,9 +18,11 @@ button, input, select, textarea, option{font-family:'IBM Plex Mono',ui-monospace
 .with-tip:hover .tip-bubble{opacity:1;transform:translateY(0);pointer-events:auto}
 .with-tip.show .tip-bubble{opacity:1;transform:translateY(0);pointer-events:auto}
 
-#holder{display:flex;justify-content:center;padding:16px}
-canvas{box-shadow:0 10px 30px rgba(0,0,0,.35);border-radius:16px;max-width:100%;height:auto}
-footer{text-align:center;padding:10px;color:#aaa}
+/* Background trail canvas pinned behind UI & p5 */
+#bgCanvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
 @media (max-width:640px){ .panel{gap:10px} #holder{padding:10px} }
 
-#bgCanvas{position:fixed;inset:0;z-index:-1;pointer-events:none}
+canvas{max-width:100%;height:auto;display:block;position:relative;z-index:1}
+
+footer{position:relative;z-index:5;text-align:center;padding:10px;color:#aaa}

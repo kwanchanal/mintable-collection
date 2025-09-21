@@ -1,5 +1,4 @@
-// No-HUD version with creator-only mint gate (owner set below)
-// Connect button now toggles Connect/Disconnect and shows short address
+// Connect button toggle + creator-only mint gate
 const OWNER = "0x0df214be853cae6f646c9929eaff857cb3452efd";
 const CONTRACT_ADDRESS = "0xYourSepoliaContractAddress"; // set after deploy
 const CHAIN_ID = 84532;
@@ -19,24 +18,13 @@ function setMintEnabled(enabled) {
   else { btn.classList.add("disabled"); btn.setAttribute("disabled", "true"); btn.title = "Creator-only"; }
 }
 
-function shortAddr(a) {
-  if (!a) return "";
-  // Example: 0xdA....d7Ffe (4 prefix + 5 suffix)
-  return a.slice(0,4) + "…" + a.slice(-5);
-}
+function shortAddr(a) { if (!a) return ""; return a.slice(0,4) + "…" + a.slice(-5); }
 
-function updateConnectButton() {
+function updateConnectButton() { 
   const btn = document.getElementById("connect");
   if (!btn) return;
-  if (isConnected && account) {
-    btn.textContent = "🦊 " + shortAddr(account);
-    btn.title = "Disconnect";
-    btn.classList.add("connected");
-  } else {
-    btn.textContent = "🦊 Connect";
-    btn.title = "Connect wallet";
-    btn.classList.remove("connected");
-  }
+  if (isConnected && account) { btn.textContent = "🦊 " + shortAddr(account); btn.title = "Disconnect"; btn.classList.add("connected"); }
+  else { btn.textContent = "🦊 Connect"; btn.title = "Connect wallet"; btn.classList.remove("connected"); }
 }
 
 async function ensureNetwork() { 
@@ -57,36 +45,20 @@ async function connectWallet() {
   setMintEnabled(account === OWNER);
   updateConnectButton();
 
-  // React to wallet changes
   window.ethereum.removeAllListeners?.("accountsChanged");
   window.ethereum.removeAllListeners?.("chainChanged");
-  window.ethereum.on("accountsChanged", (accs) => {
+  window.ethereum.on("accountsChanged", (accs) => { 
     if (!accs || accs.length === 0) { disconnectWallet(); return; }
     account = accs[0].toLowerCase();
     isConnected = true;
     setMintEnabled(account === OWNER);
     updateConnectButton();
   });
-  window.ethereum.on("chainChanged", async () => {
-    try { await ensureNetwork(); } catch(e) { console.warn(e); }
-  });
+  window.ethereum.on("chainChanged", async () => { try { await ensureNetwork(); } catch(e) { console.warn(e); } });
 }
 
-function disconnectWallet() {
-  // dapps cannot truly "disconnect" MetaMask programmatically;
-  // we clear local state and disable privileged actions.
-  provider = null;
-  signer = null;
-  account = null;
-  isConnected = false;
-  setMintEnabled(false);
-  updateConnectButton();
-}
-
-async function toggleConnect() {
-  if (!isConnected) await connectWallet();
-  else disconnectWallet();
-}
+function disconnectWallet() { provider = null; signer = null; account = null; isConnected = false; setMintEnabled(false); updateConnectButton(); }
+async function toggleConnect() { if (!isConnected) await connectWallet(); else disconnectWallet(); }
 
 function getStyleAndSeed() { 
   const collection = document.getElementById("styleSelect")?.value || "rings"; 

@@ -1,4 +1,6 @@
-// p5.js preview (mobile-friendly)
+// p5.js preview with transparent background (so bg trail shows through)
+const CANVAS_TRANSPARENT_BG = false;
+
 let seedStr=null,rng,palette,currentStyle="rings";
 function seededRandom(){let h=1779033703^seedStr.length;for(let i=0;i<seedStr.length;i++){h=Math.imul(h^seedStr.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19)}return function(){h=Math.imul(h^(h>>>16),2246822507);h=Math.imul(h^(h>>>13),3266489909);h^=h>>>16;return (h>>>0)/4294967296}}
 function srand(min=0,max=1){return min+rng()*(max-min)}function srange(a,b){return Math.floor(srand(a,b))}function pick(arr){return arr[Math.floor(srand(0,arr.length))]}function parseSeedFromURL(){const p=new URLSearchParams(window.location.search);return p.get("seed")}function hashCode(s){let h=0;for(let i=0;i<s.length;i++){h=(h<<5)-h+s.charCodeAt(i);h|=0}return h}
@@ -7,7 +9,7 @@ function initSeed(optionalSeed){seedStr=optionalSeed??parseSeedFromURL()??(Date.
 function setup(){const size=computeCanvasSize();const c=createCanvas(size,size);c.parent("holder");noLoop();palette=[color(240,200,210,190),color(120,155,135,200),color(245,215,120,210),color(202,122,92,200),color(220,220,230,220)];initSeed();document.getElementById("regen").addEventListener("click",()=>{const newSeed=(Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36));initSeed(newSeed);redraw();updateURLSeed(newSeed)});document.getElementById("applySeed").addEventListener("click",()=>{const v=document.getElementById("seed").value.trim();if(v){initSeed(v);redraw();updateURLSeed(v)}});document.getElementById("save").addEventListener("click",()=>{saveCanvas(`mintable_collection_${currentStyle}_${seedStr}.png`)});document.getElementById("styleSelect").addEventListener("change",e=>{currentStyle=e.target.value;redraw()})}
 function windowResized(){const size=computeCanvasSize();resizeCanvas(size,size);redraw()}
 function updateURLSeed(v=seedStr){const url=new URL(window.location.href);url.searchParams.set("seed",v);history.replaceState({}, "", url)}
-function draw(){background(18);if(currentStyle==="rings")drawRings();else if(currentStyle==="lines")drawFlowLines()}
+function draw(){if(CANVAS_TRANSPARENT_BG){clear();}else{background(0);}if(currentStyle==="rings")drawRings();else if(currentStyle==="lines")drawFlowLines()}
 function drawRings(){const clusters=srange(4,8);for(let n=0;n<clusters;n++){const cx=srand(width*0.1,width*0.9);const cy=srand(height*0.1,height*0.9);const baseR=srand(width*0.12,width*0.24);drawOrganicRingCluster(cx,cy,baseR)}}
 function drawOrganicRingCluster(cx,cy,baseR){const layers=srange(8,15);const wobble=srand(width*0.012,width*0.028);const density=srand(0.035,0.08);for(let r=0;r<layers;r++){let c=pick(palette);stroke(c);noFill();strokeWeight(srand(0.8,2.2));beginShape();for(let a=0;a<TWO_PI;a+=density){let nx=Math.cos(a)*0.7+r*0.03;let ny=Math.sin(a)*0.7+r*0.03;let noiseFactor=noise(nx,ny)*wobble;let rad=baseR+r*srand(width*0.009,width*0.018)+noiseFactor;let x=cx+Math.cos(a)*rad;let y=cy+Math.sin(a)*rad;vertex(x,y)}endShape(CLOSE)}}
 function drawFlowLines(){stroke(255,200);noFill();const lines=srange(40,80);for(let i=0;i<lines;i++){let y=srand(height);beginShape();for(let x=0;x<width;x+=Math.max(4,width/120)){let offset=noise(x*0.01,y*0.005,i*0.1)*(width*0.2)-(width*0.1);vertex(x,y+offset)}endShape()}}

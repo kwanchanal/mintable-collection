@@ -1,66 +1,70 @@
-
-// Background trailing line (vanilla Canvas) — grey, continuous
-(function () {
+// Background scribble — VERY long straight runs + strong jitter, sharp corners
+(function(){
   const c = document.createElement('canvas');
   c.id = 'bgCanvas';
+  c.style.position = 'fixed';
+  c.style.inset = '0';
+  c.style.zIndex = '0';
+  c.style.pointerEvents = 'none';
   document.body.prepend(c);
-  const ctx = c.getContext('2d', { alpha: true });
-  function resize() { c.width = innerWidth; c.height = innerHeight; }
-  addEventListener('resize', resize, { passive: true });
-  resize();
 
-  let x = c.width * 0.5, y = c.height * 0.5;
-  let t = 0;
+  const ctx = c.getContext('2d', { alpha: false });
+  function resize(){ c.width = innerWidth; c.height = innerHeight; ctx.fillStyle = '#000'; ctx.fillRect(0,0,c.width,c.height); }
+  addEventListener('resize', resize, { passive: true }); resize();
 
-  function fade(a){ return a*a*(3-2*a); }
-  function hash(n){ const s = Math.sin(n) * 43758.5453123; return s - Math.floor(s); }
-  function noise(x, y, z){
-    const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z||0);
-    x -= X; y -= Y; z = (z||0) - Z;
-    const u = fade(x), v = fade(y); // using 2D for speed
-    function g(i,j){ return hash(X+i + 57*(Y+j) + 113*Z); }
-    const n0=g(0,0), n1=g(1,0), n2=g(0,1), n3=g(1,1);
-    const ix0 = n0 + (n1-n0)*u;
-    const ix1 = n2 + (n3-n2)*u;
-    return ix0 + (ix1-ix0)*v;
-  }
+  const MARGIN = 8;
+  let x = MARGIN, y = MARGIN;
+  let dir = Math.random()*Math.PI*2;
+
+  // Tunables
+  const SPEED = 2.0;                 // px/frame along the heading
+  const JITTER_HEADING = 0.28;       // radians added to direction each frame (shake)
+  const JITTER_POS = 1.4;            // perpendicular positional jitter (px)
+  const SHARP_MIN = 0.9;             // radians (~51°)
+  const SHARP_MAX = 2.2;             // radians (~126°)
+  // ~15x longer than the earlier version (48–120 frames) → 720–1800
+  const STRAIGHT_MIN_FRAMES = 720;
+  const STRAIGHT_MAX_FRAMES = 1800;
+  let framesToTurn = STRAIGHT_MIN_FRAMES + Math.floor(Math.random()*(STRAIGHT_MAX_FRAMES-STRAIGHT_MIN_FRAMES+1));
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.0;
+  ctx.lineJoin = 'miter';
+  ctx.lineCap  = 'round';
 
   function step(){
-    // fade previous frame to leave a trail
-    ctx.fillStyle = 'rgba(15,15,20,0.06)';
-    ctx.fillRect(0, 0, c.width, c.height);
-
-    // direction from smooth noise
-    const scale = 0.002;
-    const ang = noise(x*scale, y*scale, t) * Math.PI * 2 * 2.0;
-    const speed = 1.6;
-    const nx = Math.cos(ang) * speed;
-    const ny = Math.sin(ang) * speed;
-
     const px = x, py = y;
-    x += nx; y += ny;
 
-    // wrap around edges
-    if (x < -10) x = c.width + 10;
-    if (x > c.width + 10) x = -10;
-    if (y < -10) y = c.height + 10;
-    if (y > c.height + 10) y = -10;
+    // Keep the heading mostly straight, but shake a bit
+    dir += (Math.random()*2 - 1) * JITTER_HEADING;
 
-    ctx.strokeStyle = 'rgba(176,176,184,0.75)';
-    ctx.lineWidth = 1.2;
-    ctx.shadowBlur = 6;
-    ctx.shadowColor = 'rgba(180,180,190,0.65)';
+    // After a very long run → make a sharp corner, then reset the run length
+    if (--framesToTurn <= 0) {
+      const ang = SHARP_MIN + Math.random()*(SHARP_MAX - SHARP_MIN);
+      dir += (Math.random() < 0.5 ? -ang : ang);
+      framesToTurn = STRAIGHT_MIN_FRAMES + Math.floor(Math.random()*(STRAIGHT_MAX_FRAMES-STRAIGHT_MIN_FRAMES+1));
+    }
+
+    // Move: forward + perpendicular positional jitter (scribbly but still straight overall)
+    const dx = Math.cos(dir), dy = Math.sin(dir);
+    const perpX = -dy, perpY = dx;
+    const jitter = (Math.random()*2 - 1) * JITTER_POS;
+    x += dx * SPEED + perpX * jitter;
+    y += dy * SPEED + perpY * jitter;
+
+    // Bounce on edges (reflect)
+    if (x <= 1){ x = 1; dir = Math.PI - dir; }
+    if (x >= c.width-1){ x = c.width-1; dir = Math.PI - dir; }
+    if (y <= 1){ y = 1; dir = -dir; }
+    if (y >= c.height-1){ y = c.height-1; dir = -dir; }
+
+    // Draw segment
     ctx.beginPath();
     ctx.moveTo(px, py);
     ctx.lineTo(x, y);
     ctx.stroke();
 
-    t += 0.0035;
     requestAnimationFrame(step);
   }
-
-  // prime background
-  ctx.fillStyle = 'rgba(15,15,20,1)';
-  ctx.fillRect(0,0,c.width,c.height);
   step();
 })();
