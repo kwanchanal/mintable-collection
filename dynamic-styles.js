@@ -116,3 +116,65 @@
     selectByURLParam();
   });
 })();
+
+// ===== dynamic-styles.js • core visibility control (robust) =====
+(function(){
+  function log(){ try{ console.debug.apply(console, ["[mc]"].concat([].slice.call(arguments))); }catch(e){} }
+  function getHiddenCore(){
+    try { return JSON.parse(localStorage.getItem('mc_hide_core')||'[]'); } catch { return []; }
+  }
+  function norm(s){ return (s||"").toString().trim().toLowerCase(); }
+
+  function findStyleSelect(){
+    return document.getElementById('styleSelect')
+        || document.querySelector('select[data-role="style"]')
+        || document.querySelector('select[name="style"]')
+        || document.querySelector('select[data-style]');
+  }
+
+  function applyHiddenCore(){
+    const sel = findStyleSelect();
+    if (!sel) { return; }
+    const hidden = getHiddenCore().map(norm);
+    if (!hidden.length) { return; }
+
+    let changed = false;
+    const opts = Array.from(sel.options);
+    const toRemove = [];
+    opts.forEach(opt => {
+      const label = norm(opt.textContent || opt.value);
+      if (hidden.includes(label)) { toRemove.push(opt); }
+    });
+    toRemove.forEach(opt => { opt.remove(); changed = true; });
+
+    if (changed) {
+      if (sel.selectedIndex < 0 && sel.options.length){ sel.selectedIndex = 0; }
+      try { sel.dispatchEvent(new Event('change')); } catch(e) {}
+      log("Applied hidden cores:", hidden);
+    }
+  }
+
+  function untilReady(){
+    let tries = 0;
+    const t = setInterval(()=>{
+      tries++;
+      const sel = findStyleSelect();
+      if (sel || tries > 40){
+        clearInterval(t);
+        applyHiddenCore();
+      }
+    }, 100);
+  }
+
+  window.addEventListener('storage', (ev)=>{
+    if (ev.key === 'mc_hide_core') { applyHiddenCore(); }
+  });
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive'){
+    untilReady();
+  } else {
+    window.addEventListener('DOMContentLoaded', untilReady, { once:true });
+    window.addEventListener('load', applyHiddenCore, { once:true });
+  }
+})();
+// ===== end: dynamic-styles.js patch =====
