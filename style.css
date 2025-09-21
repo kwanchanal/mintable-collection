@@ -18,3 +18,5 @@ button, input, select, textarea, option{font-family:'IBM Plex Mono',ui-monospace
 canvas{box-shadow:0 10px 30px rgba(0,0,0,.35);border-radius:16px;max-width:100%;height:auto}
 footer{text-align:center;padding:10px;color:#aaa}
 @media (max-width:640px){ .panel{gap:10px} #holder{padding:10px} }
+
+#bgCanvas{position:fixed;inset:0;z-index:-1;pointer-events:none}
