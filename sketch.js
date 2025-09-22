@@ -11,8 +11,13 @@ function windowResized(){const size=computeCanvasSize();resizeCanvas(size,size);
 function updateURLSeed(v=seedStr){const url=new URL(window.location.href);url.searchParams.set("seed",v);history.replaceState({}, "", url)}
 function draw(){
   if(CANVAS_TRANSPARENT_BG){ clear(); } else { background(0); }
-  drawLeh();
+  if(currentStyle === "leh"){
+    drawLeh();
+  } else if(currentStyle === "sandworm"){
+    drawSandworm();
+  }
 }
+
 
 function drawLeh() {
   noFill();
@@ -33,3 +38,104 @@ function drawLeh() {
     }
   }
 }
+
+// --- Sandworm collection ---
+function drawSandworm() {
+  background(0);
+
+  // ชั้นรองพื้นเส้น
+  push();
+  stroke(255, 50);
+  strokeWeight(0.8);
+  noFill();
+  for (let y = 0; y < height; y += 6) {
+    beginShape();
+    for (let x = 0; x <= width; x += 8) {
+      let n = noise(x * 0.006, y * 0.008, 0.25);
+      let off = map(n, 0, 1, -18, 18);
+      vertex(x, y + off);
+    }
+    endShape();
+  }
+  pop();
+
+  const cells = irange(5, 9);
+  for (let i = 0; i < cells; i++) {
+    const cx = rand(width * 0.12, width * 0.88);
+    const cy = rand(height * 0.15, height * 0.85);
+    const R  = rand(min(width, height) * 0.09, min(width, height) * 0.28);
+    drawOrganicCell(cx, cy, R, i);
+  }
+
+  const holes = irange(1, 3);
+  for (let i = 0; i < holes; i++) {
+    let cx = rand(width * 0.15, width * 0.85);
+    let cy = rand(height * 0.18, height * 0.82);
+    let r  = rand(min(width, height) * 0.06, min(width, height) * 0.14);
+    doughnutHole(cx, cy, r);
+  }
+}
+
+function drawOrganicCell(cx, cy, R, idx) {
+  const layers = irange(6, 9);
+  for (let l = 0; l < layers; l++) {
+    const col = pick(palette);
+    const aStroke = irange(80, 180);
+    const aFill   = irange(40, 120);
+
+    noFill();
+    stroke(color(red(col), green(col), blue(col), aStroke));
+    strokeWeight(rand(0.8, 1.8));
+    beginShape();
+    const density = rand(0.06, 0.12);
+    for (let ang = 0; ang < TWO_PI; ang += density) {
+      const base = map(l, 0, layers - 1, R * 0.35, R * 1.25);
+      const wave = sin(ang * rand(4.5, 7.5) + l * 0.7) * rand(R*0.01, R*0.03);
+      const n = noise(cos(ang) * 0.9 + l * 0.12 + idx * 0.3, sin(ang) * 0.9 + l * 0.12 + idx * 0.3);
+      const off = map(n, 0, 1, -R*0.08, R*0.08);
+      const r = base + wave + off;
+      vertex(cx + cos(ang) * r, cy + sin(ang) * r);
+    }
+    endShape(CLOSE);
+
+    const dots = irange(600, 1200);
+    noStroke();
+    for (let i = 0; i < dots; i++) {
+      const rr = rand(R * 0.2, R * 1.2) + noise(i * 0.01, l * 0.1) * R * 0.04;
+      const th = rand(0, TWO_PI);
+      const x = cx + cos(th) * rr + rand(-0.8, 0.8);
+      const y = cy + sin(th) * rr + rand(-0.8, 0.8);
+      const c = pick(palette);
+      fill(red(c), green(c), blue(c), aFill);
+      rect(x, y, 1, 1);
+    }
+
+    if (rand(0, 1) < 0.45) {
+      noFill();
+      stroke(color(255, 255, 255, irange(40, 110)));
+      strokeWeight(rand(0.6, 1.2));
+      const halo = R * rand(1.05, 1.4);
+      roughCircle(cx + rand(-3, 3), cy + rand(-3, 3), halo);
+    }
+  }
+}
+
+function roughCircle(cx, cy, r) {
+  beginShape();
+  const step = 0.05;
+  const freq = rand(3.0, 6.0);
+  for (let a = 0; a < TWO_PI; a += step) {
+    const jitter = sin(a * freq) * r * 0.015;
+    vertex(cx + cos(a) * (r + jitter), cy + sin(a) * (r + jitter));
+  }
+  endShape(CLOSE);
+}
+
+function doughnutHole(cx, cy, r) {
+  noStroke(); fill(0); circle(cx, cy, r * 2);
+  noFill(); stroke(255, 120); strokeWeight(1.2); roughCircle(cx, cy, r * 1.05);
+  stroke(255, 50); roughCircle(cx, cy, r * 1.25);
+}
+
+function rand(a=0,b=1){ return a + (b-a) * rng(); }
+function irange(a,b){ return floor(rand(a,b+1)); }

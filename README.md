@@ -9,7 +9,7 @@ Visitors pick a **Collection** (the rendering algorithm), choose or randomize a 
 ---
 
 ## Features
-- Collections: Leh Ladakh (single active collection key = `leh`)
+- Collections: Leh Ladakh (`leh`), Sandworm (`sandworm`)
 - Seed: Randomize (new seed each click), Apply, `?seed=` permalink
 - Mint on Base: 0.1 ETH, 10% royalty (EIP‑2981), on‑chain HTML
 - Connect toggle: shows short address, click again to disconnect
