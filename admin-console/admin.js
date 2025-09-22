@@ -1,7 +1,21 @@
-// admin.js — console without login (no connect button)
+// admin.js — console without login (compatible with dynamic-styles.js expectations)
 
 const $ = (s, r=document)=>r.querySelector(s);
 const el = (t,cls)=>{const n=document.createElement(t); if(cls) n.className=cls; return n;};
+const shortAddr=(a)=>a?a.slice(0,6)+'…'+a.slice(-4):'';
+
+// Optional connect (for future owner-only features)
+let currentAccount=null;
+async function connect(){
+  if(!window.ethereum) throw new Error('No wallet');
+  const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+  const [acc] = await provider.send("eth_requestAccounts", []);
+  currentAccount = acc;
+  $('#walletStatus').textContent = shortAddr(acc);
+}
+$('#btnConnect')?.addEventListener('click', async ()=>{
+  try{ await connect(); }catch(e){ alert(e.message||'Connect failed'); }
+});
 
 // ---------- Preview sandbox ----------
 const PREBOOT = `<!doctype html><html><head><meta charset="utf-8">
@@ -21,9 +35,11 @@ function runPreview(code){
 $('#btnPreview')?.addEventListener('click', ()=> runPreview($('#newCode').value));
 $('#btnClearPreview')?.addEventListener('click', ()=> runPreview("api.add('empty',p=>p.background(0))"));
 
-// ---------- Saved collections ----------
-const LS_KEY='mc_collections';
-function getSaved(){ try{ const v = JSON.parse(localStorage.getItem(LS_KEY)||'[]'); return Array.isArray(v)?v:[]; } catch { return []; } }
+// ---------- Saved collections (array form expected by dynamic-styles.js) ----------
+const LS_KEY='mc_collections';  // dynamic-styles.js reads this as an array of {name, code}
+function getSaved(){
+  try{ const v = JSON.parse(localStorage.getItem(LS_KEY)||'[]'); return Array.isArray(v)?v:[]; } catch{ return []; }
+}
 function setSaved(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
 
 function addCollectionToHome(){
@@ -55,8 +71,8 @@ function renderSaved(filter=''){
 }
 $('#searchSaved')?.addEventListener('input', (e)=> renderSaved(e.target.value));
 
-// ---------- Core collections ----------
-const HIDE_KEY='mc_hide_core';
+// ---------- Core collections visibility (shares storage with dynamic-styles.js) ----------
+const HIDE_KEY='mc_hide_core';                        // array of names (case-insensitive)
 const CORE_LIST=[{name:'Organic Rings'}, {name:'Flow Lines'}];
 
 function getHidden(){ try{ return JSON.parse(localStorage.getItem(HIDE_KEY)||'[]'); }catch{return []} }
@@ -78,6 +94,7 @@ function renderCore(){
     const left = el('div'); left.innerHTML = `<strong>${item.name}</strong>`;
     const right = el('div'); right.className='row';
     const bPrev = el('button','btn'); bPrev.textContent='Preview'; bPrev.onclick=()=>{
+      // simple seeded preview for core (empty canvas placeholder)
       runPreview("api.add('core', p=>{ p.background(0); p.noFill(); p.stroke(255); p.circle(p.width/2,p.height/2,Math.min(p.width,p.height)*0.6); })");
     };
     const bHide = el('button','btn'); const hidden = isHidden(item.name);
@@ -90,4 +107,6 @@ function renderCore(){
 window.addEventListener('DOMContentLoaded', ()=>{
   renderCore();
   renderSaved('');
+  $('#walletStatus').textContent = 'Not connected';
+  $('#btnRefreshCore')?.addEventListener('click', renderCore);
 });
