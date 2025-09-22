@@ -1,139 +1,80 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>admin-console • mintable-collection</title>
-    <link rel="stylesheet" href="style.css" />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-      body{background:#000;color:#e6e6ec;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace}
-      .admin-panel{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#13131a;border-bottom:1px solid #222;position:sticky;top:0;z-index:10}
-      .admin-panel .right{display:flex;gap:8px}
-      .stage{padding:16px;max-width:1100px;margin:0 auto}
-      .empty{opacity:.75;text-align:center;padding:80px 12px;border:1px dashed #333;border-radius:14px;background:#0d0f14}
-      .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;margin-top:16px}
-      .card{background:#11141a;border:1px solid #2a2a34;border-radius:14px;padding:14px}
-      .card h3{margin:0 0 10px 0;font-size:16px}
-      .row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-      .row label{min-width:130px;opacity:.85}
-      textarea{width:100%;min-height:340px;background:#0b0e13;color:#e6e6ec;border:1px solid #2a2a34;border-radius:12px;padding:10px;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace}
-      input[type="text"]{width:100%;background:#0b0e13;color:#e6e6ec;border:1px solid #2a2a34;border-radius:10px;padding:10px}
-      button{background:#222533;color:#e6e6ec;border:1px solid #333;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
-      button.secondary{background:#171a24}
-      button.danger{border-color:#3a1d1d;background:#1a1010;color:#f2c1c1}
-      iframe.preview{width:100%;height:420px;background:#000;border:1px solid #2a2a34;border-radius:12px}
-      small.mono{opacity:.8}
-      .hint{font-size:12px;opacity:.75}
-      .ok{color:#6FCF97} .bad{color:#EB5757}
-      .saved-list{margin-top:8px;display:flex;flex-direction:column;gap:10px}
-      .saved-item{border:1px solid #2a2a34;border-radius:12px;background:#0d0f14}
-      .saved-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px}
-      .saved-actions{display:flex;gap:8px;flex-wrap:wrap}
-      .saved-code{display:none;border-top:1px dashed #2a2a34;padding:10px 12px;overflow:auto;max-height:260px;background:#0b0e13;border-bottom-left-radius:12px;border-bottom-right-radius:12px}
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-  </head>
-  <body>
-    <header class="admin-panel">
-      <div class="left"><strong>admin-console</strong></div>
-      <div class="right">
-        <button id="connect">🦊 Connect</button>
-      </div>
-    </header>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>admin-console</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .wrap{max-width:1100px;margin:0 auto;padding:14px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .card{background:#13131a;border:1px solid #222;border-radius:12px;padding:12px;position:relative}
+    .card h3{margin:0 0 10px 0}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .muted{opacity:.85}
+    .list .item{display:flex;align-items:center;justify-content:space-between;border:1px solid #242433;border-radius:10px;padding:10px;margin:8px 0;background:#0f1117}
+    .preview{width:100%;height:300px;border:1px solid #242433;border-radius:10px;background:#000}
+    textarea.input{min-height:300px;white-space:pre;font-family:monospace;font-size:13px}
+    .span-2{grid-column:1 / span 2}
+    @media (max-width:860px){.grid{grid-template-columns:1fr}.span-2{grid-column:auto}}
+  </style>
+  <script defer src="admin.js"></script>
+</head>
+<body>
+  <div class="panel">
+    <div class="left">
+      <strong>admin-console</strong>
+    </div>
+  </div>
 
-    <main class="stage" id="stage">
-      <div class="empty" id="emptyMsg">
-        <p>only admin allow :(</p>
-        <p class="hint">Connect the admin wallet to continue.</p>
+  <div class="wrap grid">
+    <section class="card">
+      <h3>+ Add collection</h3>
+      <div class="row">
+        <label for="newName">Collection name</label>
+        <input id="newName" class="input" placeholder="e.g., kodomo" />
+        <label for="newCode">Code (style.js)</label>
       </div>
-
-      <section id="editorSec" class="grid" style="display:none">
-        <div class="card">
-          <h3>➕ Add collection</h3>
-          <div class="row">
-            <label>Collection name</label>
-            <input id="collName" type="text" placeholder="e.g., kodomo" />
-          </div>
-          <div class="row" style="align-items:flex-start">
-            <label style="margin-top:6px">Code (style.js)</label>
-            <div style="flex:1 1 auto;width:100%">
-              <textarea id="collCode" spellcheck="false" placeholder="// use the helper API: api.add('name', (p)=>{/* draw with p (p5 instance) */})"></textarea>
-              <div class="hint" style="margin-top:8px">
-                This code will run inside a tiny sandbox and should call <code>api.add('your-name', drawFn)</code>.<br/>
-                The draw function receives a p5 instance <code>p</code>. Use <code>p.background(0)</code> if you need.
-              </div>
-            </div>
-          </div>
-          <div class="row">
-            <button id="btnPreview">👀 Preview</button>
-            <button id="btnAdd">📌 Add collection to home</button>
-            <span id="status" class="hint"></span>
-          </div>
-          <div class="row">
-            <details>
-              <summary>Starter snippet</summary>
-              <pre class="hint"><code>api.add('kodomo', (p)=>{
+      <textarea id="newCode" class="input textarea" placeholder="// use the helper API: api.add('name', (p)=>{/* draw with p (p5 instance) */})"></textarea>
+      <div class="row">
+        <button id="btnPreview" class="btn">👀 Preview</button>
+        <button id="btnAddToHome" class="btn">➕ Add collection to home</button>
+      </div>
+      <details style="margin-top:8px">
+        <summary>▶ Starter snippet</summary>
+<pre class="muted">// Example
+api.add('demo', (p) => {
   p.background(0);
-  p.noFill();
-  p.stroke(255, 220);
-  const n = 40;
-  for (let i = 0; i &lt; n; i++) {
-    p.beginShape();
-    for (let x = 0; x &lt; p.width; x+=Math.max(3, p.width/120)) {
-      const y = p.height*0.5 + Math.sin((x*0.02)+(i*0.3)) * (p.height*0.15) + (i*2);
-      p.vertex(x, y);
-    }
-    p.endShape();
-  }
-});</code></pre>
-            </details>
-          </div>
-        </div>
+  p.noFill(); p.stroke(255);
+  p.circle(p.width/2, p.height/2, Math.min(p.width,p.height)*0.6);
+});</pre>
+      </details>
+    </section>
 
-        <div class="card">
-          <h3>🧪 Preview</h3>
-          <iframe id="preview" class="preview"></iframe>
-          <div class="row" style="justify-content:space-between;margin-top:8px">
-            <small class="mono">The preview runs your code in an isolated iframe (p5 included).</small>
-            <button id="btnClear" class="secondary">Clear</button>
-          </div>
-        </div>
-      </section>
+    <section class="card">
+      <h3>🖼️ Preview</h3>
+      <iframe id="previewFrame" class="preview" sandbox="allow-scripts"></iframe>
+      <div class="row" style="margin-top:8px">
+        <button id="btnClearPreview" class="btn">Clear</button>
+      </div>
+      <p class="muted">The preview runs your code in an isolated iframe (p5 included).</p>
+    </section>
 
-      <section class="stage" style="padding-top:0">
-        <div class="card" style="max-width:1100px;margin:16px auto">
-          <h3>🧩 Core collections (from Home)</h3>
-          <div class="hint" style="margin-bottom:8px">These are built-in styles shipped with your site. You can preview or hide them from Home without changing any code.</div>
-          <div class="row" style="justify-content:flex-end;margin-top:6px">
-            <button id="refreshCore" class="secondary">Refresh list</button>
-          </div>
-          <div id="coreList" class="saved-list"></div>
-        </div>
-      </section>
+    <section class="card span-2">
+      <h3>🌿 Core collections (from Home)</h3>
+      <p class="muted">These are built-in styles shipped with your site. You can preview or hide them from Home without changing any code.</p>
+      <div class="row" style="justify-content:flex-end"><button id="btnRefreshCore" class="btn">Refresh list</button></div>
+      <div id="coreList" class="list"></div>
+    </section>
 
-      <section class="stage" style="padding-top:0">
-        <div class="card" style="max-width:1100px;margin:16px auto">
-          <h3>💾 Saved collections</h3>
-          <div class="row" style="justify-content:space-between;gap:12px">
-            <input id="searchSaved" type="text" placeholder="Search by name..." style="max-width:360px">
-            <span class="hint">Manage collections stored in <code>localStorage.mc_collections</code></span>
-          </div>
-          <div id="savedList" class="saved-list"></div>
-        </div>
-      </section>
-    </main>
-
-    <script src="admin.js" defer></script>
-    <!-- Hard fallback kick if something delays DOM events -->
-    <script>
-      (function kick(){
-        function go(){ if (window.renderCoreList) window.renderCoreList(); if (window.renderSavedList) window.renderSavedList(); }
-        if (document.readyState === 'complete' || document.readyState === 'interactive') { setTimeout(go, 0); }
-        window.addEventListener('load', go, { once:true });
-        document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) go(); });
-        setTimeout(go, 400);
-      })();
-    </script>
-  </body>
+    <section class="card span-2">
+      <h3>💾 Saved collections</h3>
+      <div class="row">
+        <input id="searchSaved" class="input" placeholder="Search by name…" />
+        <span class="muted">Manage collections stored in <code>localStorage.mc_collections</code></span>
+      </div>
+      <div id="savedList" class="list"></div>
+    </section>
+  </div>
+</body>
 </html>

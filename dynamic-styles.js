@@ -29,7 +29,7 @@
       try{
         const api = { add: (n, fn)=>register(n, fn) };
         // Execute user code in a limited scope (no global "this").
-        (new Function("api", code))(api);
+        (new Function("api", /\bapi\s*\.\s*add\s*\(/.test(code) ? code : ("api.add("+JSON.stringify(name)+", (p)=>{"+code+"});") ))(api);
         if (name && !REG[name]){
           // If user added under some other name in code, still add the provided name mapping if available.
           if (REG[Object.keys(REG)[0]]){
@@ -56,7 +56,14 @@
           if (typeof window.CANVAS_TRANSPARENT_BG !== 'undefined' && !window.CANVAS_TRANSPARENT_BG){
             // background will be done by the user style if needed; keep consistent with existing behavior
           }
-          REG[window.currentStyle](window); // pass p5 instance via global (instance mode uses globals)
+          (function(){
+            // Adapter: redirect p.* to global p5 functions/vars on window
+            const P = new Proxy({}, { get(_, k){ return window[k]; }, set(_,k,v){ window[k]=v; return true; } });
+            if (typeof window.CANVAS_TRANSPARENT_BG === 'undefined' || !window.CANVAS_TRANSPARENT_BG){
+              try{ if (typeof window.background === 'function') window.background(0); }catch(_){}
+            }
+            REG[window.currentStyle](P);
+          })();
           return;
         }
       }catch(e){
@@ -70,7 +77,12 @@
 
   // --- Hide core collections + URL style selection ---
   function getHiddenCore(){
-    try { return JSON.parse(localStorage.getItem('mc_hide_core')||'[]'); } catch { return []; }
+    try {
+      const raw = JSON.parse(localStorage.getItem('mc_hide_core')||'[]');
+      if (Array.isArray(raw)) return raw;
+      if (raw && typeof raw==='object') return Object.keys(raw).filter(k=>raw[k]);
+      return [];
+    } catch { return []; }
   }
   function setHiddenCore(arr){
     localStorage.setItem('mc_hide_core', JSON.stringify(arr||[]));
@@ -121,7 +133,12 @@
 (function(){
   function log(){ try{ console.debug.apply(console, ["[mc]"].concat([].slice.call(arguments))); }catch(e){} }
   function getHiddenCore(){
-    try { return JSON.parse(localStorage.getItem('mc_hide_core')||'[]'); } catch { return []; }
+    try {
+      const raw = JSON.parse(localStorage.getItem('mc_hide_core')||'[]');
+      if (Array.isArray(raw)) return raw;
+      if (raw && typeof raw==='object') return Object.keys(raw).filter(k=>raw[k]);
+      return [];
+    } catch { return []; }
   }
   function norm(s){ return (s||"").toString().trim().toLowerCase(); }
 

@@ -1,197 +1,93 @@
-// admin.js — wallet-gated admin console for adding dynamic collections + core controls
-const OWNER = "0x0df214be853cae6f646c9929eaff857cb3452efd"; // admin wallet (lowercased)
-const CHAIN_ID = 84532;
-const NETWORK_PARAMS = { chainId:"0x14A34", chainName:"Base Sepolia", rpcUrls:["https://sepolia.base.org"], nativeCurrency:{name:"Ether",symbol:"ETH",decimals:18}, blockExplorerUrls:["https://sepolia.basescan.org"] };
+// admin.js — console without login (no connect button)
 
-let provider=null, signer=null, account=null, isConnected=false;
+const $ = (s, r=document)=>r.querySelector(s);
+const el = (t,cls)=>{const n=document.createElement(t); if(cls) n.className=cls; return n;};
 
-function shortAddr(a){ return a? (a.slice(0,4) + "…" + a.slice(-5)) : ""; }
-function updateUI(){
-  const empty = document.getElementById('emptyMsg');
-  const editor = document.getElementById('editorSec');
-  if (empty && editor){
-    if (isConnected && account === OWNER) { empty.style.display = 'none'; editor.style.display = 'grid'; }
-    else { empty.style.display = ''; editor.style.display = 'none'; }
-  }
-  const btn = document.getElementById('connect');
-  if (btn){ btn.textContent = isConnected? ("🦊 " + shortAddr(account)) : "🦊 Connect"; btn.title = isConnected ? "Disconnect" : "Connect wallet"; }
+// ---------- Preview sandbox ----------
+const PREBOOT = `<!doctype html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;height:100%;background:#000;color:#ddd}</style>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.min.js"></script></head><body></body></html>`;
+
+function runPreview(code){
+  const iframe = $('#previewFrame');
+  iframe.srcdoc = PREBOOT;
+  setTimeout(()=>{
+    const doc = iframe.contentDocument;
+    iframe.contentWindow.api = { add:(name,draw)=> new iframe.contentWindow.p5(p=>{ p.setup=()=>{p.createCanvas(520,320)}; p.draw=()=>draw(p); }) };
+    const s = doc.createElement('script'); s.type='module'; s.textContent = code;
+    doc.body.appendChild(s);
+  }, 30);
 }
+$('#btnPreview')?.addEventListener('click', ()=> runPreview($('#newCode').value));
+$('#btnClearPreview')?.addEventListener('click', ()=> runPreview("api.add('empty',p=>p.background(0))"));
 
-async function ensureNetwork(){ 
-  if (!provider) return;
-  const net = await provider.getNetwork(); 
-  if (net.chainId === CHAIN_ID) return; 
-  try { await provider.send("wallet_switchEthereumChain", [{ chainId: NETWORK_PARAMS.chainId }]); } 
-  catch (e) { if (e && e.code === 4902) await provider.send("wallet_addEthereumChain", [NETWORK_PARAMS]); }
+// ---------- Saved collections ----------
+const LS_KEY='mc_collections';
+function getSaved(){ try{ const v = JSON.parse(localStorage.getItem(LS_KEY)||'[]'); return Array.isArray(v)?v:[]; } catch { return []; } }
+function setSaved(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
+
+function addCollectionToHome(){
+  const name = ($('#newName').value||'').trim();
+  const code = $('#newCode').value||'';
+  if(!name) return alert('Please enter a collection name');
+  if(!code) return alert('Please paste your style.js code');
+  const arr = getSaved();
+  const i = arr.findIndex(x => (x.name||'').toLowerCase() === name.toLowerCase());
+  if(i>=0) arr[i].code = code; else arr.push({name, code});
+  setSaved(arr);
+  renderSaved($('#searchSaved').value||'');
+  alert('Saved! Switch to Home to try it.');
 }
+$('#btnAddToHome')?.addEventListener('click', addCollectionToHome);
 
-async function connectWallet(){
-  if (!window.ethereum){ alert("Please install MetaMask"); return; }
-  provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-  const [acc] = await provider.send("eth_requestAccounts", []);
-  signer = provider.getSigner();
-  account = acc.toLowerCase();
-  await ensureNetwork();
-  isConnected = true;
-  window.ethereum.on("accountsChanged", (accs)=>{
-    if (!accs || !accs.length){ disconnectWallet(); return; }
-    account = accs[0].toLowerCase(); isConnected = true; updateUI();
+function renderSaved(filter=''){
+  const box = $('#savedList'); box.innerHTML='';
+  const arr = getSaved().filter(x => (x.name||'').toLowerCase().includes((filter||'').toLowerCase()));
+  if(!arr.length){ box.innerHTML = '<div class="muted">No saved collections</div>'; return; }
+  arr.forEach(({name, code})=>{
+    const row = el('div','item');
+    const left = el('div'); left.innerHTML=`<strong>${name}</strong>`;
+    const right = el('div'); right.className='row';
+    const bPrev = el('button','btn'); bPrev.textContent='Preview'; bPrev.onclick=()=>runPreview(code);
+    const bDel = el('button','btn'); bDel.textContent='Delete'; bDel.onclick=()=>{ const a=getSaved().filter(v=>v.name!==name); setSaved(a); renderSaved(filter); };
+    right.append(bPrev,bDel); row.append(left,right); box.append(row);
   });
-  updateUI();
+}
+$('#searchSaved')?.addEventListener('input', (e)=> renderSaved(e.target.value));
+
+// ---------- Core collections ----------
+const HIDE_KEY='mc_hide_core';
+const CORE_LIST=[{name:'Organic Rings'}, {name:'Flow Lines'}];
+
+function getHidden(){ try{ return JSON.parse(localStorage.getItem(HIDE_KEY)||'[]'); }catch{return []} }
+function setHidden(v){ localStorage.setItem(HIDE_KEY, JSON.stringify(v||[])); }
+function isHidden(n){ const hid=getHidden().map(s=>(s||'').toLowerCase()); return hid.includes((n||'').toLowerCase()); }
+
+function toggleCore(name){
+  const hid = getHidden();
+  const idx = hid.findIndex(s => (s||'').toLowerCase() === name.toLowerCase());
+  if(idx>=0) hid.splice(idx,1); else hid.push(name);
+  setHidden(hid);
+  renderCore();
 }
 
-function disconnectWallet(){ provider=null; signer=null; account=null; isConnected=false; updateUI(); }
-async function toggleConnect(){ if (!isConnected) await connectWallet(); else disconnectWallet(); }
-
-// ------- storage helpers -------
-function getCollections(){ try{ return JSON.parse(localStorage.getItem("mc_collections")||"[]"); }catch{ return []; } }
-function setCollections(list){ localStorage.setItem("mc_collections", JSON.stringify(list)); }
-function getHiddenCore(){ try { return JSON.parse(localStorage.getItem('mc_hide_core')||'[]'); } catch { return []; } }
-function setHiddenCore(arr){ localStorage.setItem('mc_hide_core', JSON.stringify(arr||[])); }
-
-// ------- editor handlers -------
-function showStatus(msg, ok=false){ const el = document.getElementById('status'); if (el){ el.textContent = msg || ""; el.className = "hint " + (ok? "ok":"bad");} }
-
-function buildPreviewHTML(name, code){
-  return `<!doctype html>
-<html><head><meta charset="utf-8" />
-<style>html,body{margin:0;background:#000;color:#e6e6ec;font-family:ui-monospace,Menlo,Consolas,monospace}</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.2/p5.min.js"></script>
-</head><body>
-<main id="holder"></main>
-<script>
-  (function(){
-    const registry = {};
-    const api = { add: (n, fn)=>{ registry[n]=fn; } };
-    try{ (new Function("api", ${JSON.stringify("/* sandbox warmup */")}))(api); }catch(e){ document.body.innerHTML = '<pre style="color:#EB5757;padding:12px">Error in code: '+ e.message +'</pre>'; return; }
-    try{ (new Function("api", ${JSON.stringify(code)}))(api); }catch(e){ document.body.innerHTML = '<pre style="color:#EB5757;padding:12px">Error in code: '+ e.message +'</pre>'; return; }
-    const name = ${JSON.stringify(name)};
-    const drawFn = registry[name] || registry[Object.keys(registry)[0]];
-    if (!drawFn){ document.body.innerHTML = '<pre style="color:#EB5757;padding:12px">No style registered. Use api.add("name", fn)</pre>'; return; }
-    new p5((p)=>{
-      p.setup = ()=>{ const c = p.createCanvas(Math.max(280, Math.min(window.innerWidth-20, 800)), Math.max(280, Math.min(window.innerHeight-20, 800))); c.parent("holder"); p.noLoop(); };
-      p.draw = ()=>{ try{ drawFn(p); }catch(e){ p.background(0); p.fill(235,87,87); p.text('Runtime error: '+e.message, 10, 20); } };
-    });
-  })();
-</script>
-</body></html>`;
-}
-function handlePreview(){ const name = document.getElementById('collName').value.trim(); const code = document.getElementById('collCode').value; const iframe = document.getElementById('preview'); if(!name) return showStatus("Missing collection name"); if(!code.trim()) return showStatus("Missing code"); const blob = new Blob([buildPreviewHTML(name, code)], {type: "text/html"}); iframe.src = URL.createObjectURL(blob); showStatus("Preview updated", true); }
-function handleAdd(){ const name = document.getElementById('collName').value.trim(); const code = document.getElementById('collCode').value; if(!name) return showStatus("Missing collection name"); if(!code.trim()) return showStatus("Missing code"); const list = getCollections(); const exists = list.find(x => (x.name||'').toLowerCase() === name.toLowerCase()); if (exists){ exists.code = code; } else { list.push({name, code}); } setCollections(list); renderSavedList(); showStatus("Saved. It will appear on home after refresh.", true); }
-function handleClear(){ const iframe = document.getElementById('preview'); if (iframe) iframe.src='about:blank'; showStatus(""); }
-
-// ------- saved list -------
-function renderSavedList(){
-  const wrap = document.getElementById('savedList'); if (!wrap) return;
-  const q = (document.getElementById('searchSaved')?.value || '').trim().toLowerCase();
-  const list = getCollections();
-  wrap.innerHTML = '';
-  const filtered = list.filter(x => !q || (x.name||'').toLowerCase().includes(q));
-  if (!filtered.length){ const empty = document.createElement('div'); empty.className='empty'; empty.textContent='No saved collections'; wrap.appendChild(empty); return; }
-  filtered.forEach(item=>{
-    const box = document.createElement('div'); box.className='saved-item'; box.dataset.name=item.name;
-    box.innerHTML = `
-      <div class="saved-head">
-        <div><strong>${item.name||'(untitled)'}</strong></div>
-        <div class="saved-actions">
-          <button data-act="view">View code</button>
-          <button data-act="copy">Copy</button>
-          <button data-act="load">Load in editor</button>
-          <button data-act="preview">Preview</button>
-          <button data-act="remove" class="danger">Remove from Home</button>
-        </div>
-      </div>
-      <pre class="saved-code"><code>${(item.code||'').replace(/[<>&]/g, m => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]))}</code></pre>
-    `;
-    wrap.appendChild(box);
+function renderCore(){
+  const list = $('#coreList'); list.innerHTML='';
+  CORE_LIST.forEach(item=>{
+    const row = el('div','item');
+    const left = el('div'); left.innerHTML = `<strong>${item.name}</strong>`;
+    const right = el('div'); right.className='row';
+    const bPrev = el('button','btn'); bPrev.textContent='Preview'; bPrev.onclick=()=>{
+      runPreview("api.add('core', p=>{ p.background(0); p.noFill(); p.stroke(255); p.circle(p.width/2,p.height/2,Math.min(p.width,p.height)*0.6); })");
+    };
+    const bHide = el('button','btn'); const hidden = isHidden(item.name);
+    bHide.textContent = hidden ? 'Unhide on Home' : 'Hide from Home';
+    bHide.onclick = ()=> toggleCore(item.name);
+    right.append(bPrev,bHide); row.append(left,right); list.append(row);
   });
-  wrap.onclick = (e)=>{
-    const btn = e.target.closest('button[data-act]'); if (!btn) return;
-    const act = btn.dataset.act; const itemEl = btn.closest('.saved-item'); const name = itemEl?.dataset?.name;
-    const all = getCollections(); const item = all.find(x => (x.name||'').toLowerCase() === (name||'').toLowerCase()); if (!item) return;
-    switch(act){
-      case 'view': { const pre = itemEl.querySelector('.saved-code'); pre.style.display = (pre.style.display === 'block') ? 'none' : 'block'; break; }
-      case 'copy': { navigator.clipboard.writeText(item.code||'').then(()=>showStatus('Copied!', true)).catch(()=>showStatus('Copy failed', false)); break; }
-      case 'load': { document.getElementById('collName').value = item.name||''; document.getElementById('collCode').value = item.code||''; showStatus('Loaded into editor', true); break; }
-      case 'preview': { document.getElementById('collName').value = item.name||''; document.getElementById('collCode').value = item.code||''; handlePreview(); break; }
-      case 'remove': { if (!confirm(`Remove "${item.name}" from Home?`)) return; const remain = all.filter(x => (x.name||'').toLowerCase() !== (item.name||'').toLowerCase()); setCollections(remain); renderSavedList(); showStatus('Removed. Refresh Home to update.', true); break; }
-    }
-  };
-  const search = document.getElementById('searchSaved'); if (search && !search._wired){ search._wired = true; search.addEventListener('input', ()=>renderSavedList()); }
 }
 
-// ------- core list (read from index.html) -------
-async function fetchCoreListFromIndex(){
-  try{
-    const res = await fetch('index.html', { cache: 'no-store' });
-    const txt = await res.text();
-    const doc = new DOMParser().parseFromString(txt, 'text/html');
-    const opts = Array.from(doc.querySelectorAll('#styleSelect option')).map(o => (o.textContent || o.value || '').trim()).filter(Boolean);
-    const unique = Array.from(new Set(opts));
-    return unique;
-  }catch(e){
-    console.warn('fetchCoreListFromIndex failed', e);
-    return [];
-  }
-}
-async function renderCoreList(){
-  const wrap = document.getElementById('coreList'); if (!wrap) return;
-  wrap.innerHTML = '';
-  const names = await fetchCoreListFromIndex();
-  const hidden = getHiddenCore().map(s=> (s||'').toLowerCase());
-  const list = names.length ? names : ["Organic Rings","Flow Lines"]; // fallback
-  list.forEach(name=>{
-    const isHidden = hidden.includes(name.toLowerCase());
-    const box = document.createElement('div'); box.className = 'saved-item'; box.dataset.name = name;
-    box.innerHTML = `
-      <div class="saved-head">
-        <div><strong>${name}</strong> ${isHidden? '<span class="hint bad">(hidden)</span>':''}</div>
-        <div class="saved-actions">
-          <button data-act="previewCore">Preview</button>
-          <button data-act="${isHidden? 'unhideCore':'hideCore'}" class="${isHidden? '':'danger'}">${isHidden? 'Unhide on Home':'Hide from Home'}</button>
-        </div>
-      </div>`;
-    wrap.appendChild(box);
-  });
-  wrap.onclick = (e)=>{
-    const btn = e.target.closest('button[data-act]'); if (!btn) return;
-    const act = btn.dataset.act; const name = btn.closest('.saved-item')?.dataset?.name; if (!name) return;
-    let list = getHiddenCore();
-    switch(act){
-      case 'previewCore': {
-        const iframe = document.getElementById('preview');
-        if (iframe){ iframe.src = `index.html?style=${encodeURIComponent(name)}`; showStatus(`Previewing core: ${name}`, true); }
-        else { window.open(`index.html?style=${encodeURIComponent(name)}`, '_blank'); }
-        break;
-      }
-      case 'hideCore': {
-        if (!list.map(s=>s.toLowerCase()).includes(name.toLowerCase())) list.push(name);
-        setHiddenCore(list); renderCoreList(); showStatus('Hidden on Home (refresh to see).', true); break;
-      }
-      case 'unhideCore': {
-        list = list.filter(s => s.toLowerCase() !== name.toLowerCase());
-        setHiddenCore(list); renderCoreList(); showStatus('Visible on Home again.', true); break;
-      }
-    }
-  };
-}
-
-// ------- ensure render -------
-function ensureRender(attempt=0){
-  try { renderCoreList(); } catch(e){}
-  try { renderSavedList(); } catch(e){}
-  if (attempt < 10) setTimeout(()=>ensureRender(attempt+1), 200);
-}
-
-window.addEventListener("DOMContentLoaded", ()=>{
-  const c=document.getElementById('connect'); if (c) c.addEventListener('click', toggleConnect);
-  const pv=document.getElementById('btnPreview'); if (pv) pv.addEventListener('click', handlePreview);
-  const ad=document.getElementById('btnAdd'); if (ad) ad.addEventListener('click', handleAdd);
-  const cl=document.getElementById('btnClear'); if (cl) cl.addEventListener('click', handleClear);
-  const rc=document.getElementById('refreshCore'); if(rc) rc.addEventListener('click', ()=>renderCoreList());
-  renderSavedList();
-  renderCoreList();
-  updateUI();
-  ensureRender();
+window.addEventListener('DOMContentLoaded', ()=>{
+  renderCore();
+  renderSaved('');
 });
-window.addEventListener('load', ensureRender);
