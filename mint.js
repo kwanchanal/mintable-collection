@@ -79,7 +79,7 @@ async function toggleConnect() {
 }
 
 function getStyleAndSeed() { 
-  const collection = document.getElementById("styleSelect")?.value || "rings"; 
+  const collection = document.getElementById("styleSelect")?.value || "leh"; 
   const seed = (document.getElementById("seed")?.value || "auto"); 
   return { collection, seed }; 
 }
