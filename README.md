@@ -9,7 +9,7 @@ Visitors pick a **Collection** (the rendering algorithm), choose or randomize a 
 ---
 
 ## Features
-- Collections: Organic Rings, Flow Lines
+- Collections: Organic Rings, Leh Ladakh
 - Seed: Randomize (new seed each click), Apply, `?seed=` permalink
 - Mint on Base: 0.1 ETH, 10% royalty (EIP‑2981), on‑chain HTML
 - Connect toggle: shows short address, click again to disconnect
