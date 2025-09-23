@@ -28,10 +28,17 @@
   <option value="leh">Leh Ladakh</option>
 </select>
         <button id="regen">🎲 Randomize</button>
-        <label>Seed</label>
-        <input id="seed" type="text" placeholder="auto" />
-        <button id="applySeed">Apply</button>
-        <span id="seedEcho" class="seedEcho"></span>
+        <label class="with-tip" id="seedLabel"><span class="emoji" aria-hidden="true">📖</span> Seed
+  <span class="tip-bubble" id="seedTip">
+    A seed is a number or text string that acts as the starting point for generating the artwork. <b>Why is it important?</b> 🙉
+    Each seed produces its own unique combination of lines, colors, and forms.
+    Using the same seed will always recreate the same visual outcome, <b>making it the digital fingerprint of a piece</b>.
+    When minted, the pair of <i>collection</i> and <i>seed</i> is permanently recorded on-chain, ensuring the work’s authenticity and singular identity. 🫨
+  </span>
+</label>
+<input id="seed" type="text" placeholder="auto" />
+<button id="applySeed">Apply</button>
+<span id="seedEcho" class="seedEcho"></span>
       </div>
       <div class="right">
         <button id="save">💾 Save</button>
@@ -53,5 +60,14 @@
       collLabel.addEventListener('click', (e) => {{ e.stopPropagation(); collLabel.classList.toggle('show'); }});
       document.addEventListener('click', () => collLabel.classList.remove('show'));
     </script>
+    <script>
+      // Tooltip: Seed (hover + click)
+      const seedLabel = document.getElementById('seedLabel');
+      if (seedLabel) {
+        seedLabel.addEventListener('click', (e) => { e.stopPropagation(); seedLabel.classList.toggle('show'); });
+        document.addEventListener('click', () => seedLabel.classList.remove('show'));
+      }
+    </script>
+
   </body>
 </html>
