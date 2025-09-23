@@ -106,6 +106,7 @@ function draw(){
   } else if(currentStyle === "bangkok"){
     drawBangkok();
   }
+  else if(currentStyle === "sukhumvit"){ drawSukhumvit(); }
   else if(currentStyle === "ekk"){ drawEkkamai(); }
 }
 
@@ -490,4 +491,186 @@ function drawDottedLine_EKK(x1, y1, x2, y2, num) {
     const t = i / num;
     circle(lerp(x1, x2, t), lerp(y1, y2, t), 5);
   }
+}
+
+
+// ---------- SUKHUMVIT ----------
+// Abstract City Map (random on click)
+function drawSukhumvit(){
+  let palette_SUK = [
+    color(35), color(80),
+    color(10, 140, 200),
+    color(0, 170, 130),
+    color(255, 90, 100),
+    color(255, 180, 0),
+    color(170, 120, 230),
+    color(20, 200, 170),
+  ];
+  let bg = color(250);
+
+  background(bg);
+
+  stroke(230); strokeWeight(2); noFill();
+  rect(20, 20, width-40, height-40, 4);
+
+  drawGrid_SUK();
+
+  const roads = int(random(8, 12));
+  for (let i = 0; i < roads; i++) drawRoad_SUK();
+
+  drawStations_SUK();
+
+  const icons = int(random(100, 150));
+  for (let i = 0; i < icons; i++) {
+    const x = random(40, width-40);
+    const y = random(40, height-40);
+    drawGlyph_SUK(x, y, random(10, 22), int(random(12)), palette_SUK);
+  }
+
+  stroke(235); noFill();
+  rect(26, 26, width-52, height-52);
+}
+
+function drawGrid_SUK() {
+  stroke(240); strokeWeight(1);
+  for (let x = 40; x < width-40; x += 40) line(x, 40, x, height-40);
+  for (let y = 40; y < height-40; y += 40) line(40, y, width-40, y);
+}
+
+function drawRoad_SUK() {
+  const n = int(random(3, 6));
+  let pts = [];
+  for (let i = 0; i < n; i++) {
+    pts.push(createVector(
+      constrain(randomGaussian(width/2, width*0.25), 50, width-50),
+      constrain(randomGaussian(height/2, height*0.25), 50, height-50)
+    ));
+  }
+  const style = int(random(3));
+  const col = random([color(30), color(120), color(220,80,90)]);
+  stroke(col);
+  if (style === 0) { strokeWeight(1.8); }
+  if (style === 1) { strokeWeight(1.8); }
+  if (style === 2) { strokeWeight(1.2); }
+
+  for (let i=0; i<pts.length-1; i++) {
+    if (style === 0) line(pts[i].x, pts[i].y, pts[i+1].x, pts[i+1].y);
+    if (style === 1) dashed_SUK(pts[i], pts[i+1], 10, 6);
+    if (style === 2) dotted_SUK(pts[i], pts[i+1], 8, 3);
+  }
+}
+
+function drawStations_SUK() {
+  const k = int(random(40, 65));
+  noStroke();
+  for (let i=0; i<k; i++) {
+    const d = random([4,6,8]);
+    fill(random([color(30), color(255, 90, 100), color(0)]));
+    circle(random(50, width-50), random(50, height-50), d);
+  }
+}
+
+function dashed_SUK(a, b, len, gap) {
+  const d = p5.Vector.dist(a, b);
+  const v = p5.Vector.sub(b, a).setMag(len+gap);
+  let p = a.copy();
+  while (p5.Vector.dist(p, a) < d) {
+    const p2 = p5.Vector.add(p, v.copy().setMag(len));
+    line(p.x, p.y, p2.x, p2.y);
+    p.add(v);
+  }
+}
+function dotted_SUK(a, b, gap, dotSize) {
+  const d = p5.Vector.dist(a, b);
+  const step = gap;
+  const dir = p5.Vector.sub(b, a).setMag(step);
+  let p = a.copy();
+  noStroke(); fill(30);
+  while (p5.Vector.dist(p, a) < d) {
+    circle(p.x, p.y, dotSize);
+    p.add(dir);
+  }
+  stroke(30);
+}
+
+function drawGlyph_SUK(x, y, s, type, palette_SUK) {
+  push();
+  translate(x, y);
+  rectMode(CENTER);
+  strokeCap(ROUND);
+
+  function pick() { return random(palette_SUK); }
+
+  switch (type) {
+    case 0:
+      noStroke(); fill(pick());
+      triangle(0, -s*0.4, s*0.55, -s*0.2, 0, 0);
+      stroke(30); strokeWeight(1.5); line(0, -s*0.5, 0, s*0.5);
+      break;
+    case 1:
+      noStroke(); fill(pick());
+      rect(0, 0, s*0.9, s*1.4, 2);
+      fill(30);
+      for (let i=-2; i<=2; i++) rect(i*s*0.18, 0, s*0.06, s*1.1);
+      break;
+    case 2:
+      noStroke(); fill(pick());
+      triangle(0, -s*0.5, -s*0.45, s*0.1, s*0.45, s*0.1);
+      fill(30); rect(0, s*0.35, s*0.12, s*0.5);
+      break;
+    case 3:
+      noStroke(); fill(pick());
+      arc(0, 0, s*1.2, s*1.2, PI, TWO_PI, PIE);
+      fill(30); rect(0, s*0.5, s*0.2, s*0.6);
+      break;
+    case 4:
+      noStroke(); fill(pick());
+      rect(-s*0.25, s*0.1, s*0.5, s*0.2);
+      rect(0, -s*0.1, s*0.5, s*0.2);
+      rect(s*0.25, -s*0.3, s*0.5, s*0.2);
+      break;
+    case 5:
+      noFill(); stroke(30); strokeWeight(1.5);
+      beginShape();
+      for (let i=0;i<6;i++) vertex(map(i,0,5,-s*0.5,s*0.5), (i%2?-1:1)*s*0.2);
+      endShape();
+      break;
+    case 6:
+      noFill(); stroke(30); strokeWeight(1);
+      rect(0,0,s,s*0.7);
+      for (let x=-s*0.4;x<=s*0.4;x+=s*0.15) line(x,-s*0.3,x+s*0.3,s*0.35);
+      break;
+    case 7:
+      noStroke();
+      fill(30); circle(0,0,s*0.22);
+      fill(255); circle(0,0,s*0.42);
+      fill(pick()); circle(0,0,s*0.14);
+      break;
+    case 8:
+      noStroke();
+      const k = int(random(2,5));
+      for (let i=0; i<k; i++) {
+        fill(pick());
+        rect(0, -s*0.5 + i*(s*0.35), random(s*0.3, s), s*0.12, 2);
+      }
+      break;
+    case 9:
+      noStroke();
+      fill(30); circle(-s*0.2,0,s*0.12);
+      fill(pick()); circle(s*0.25,0,s*0.18);
+      stroke(30); strokeWeight(1.5); line(-s*0.5,-s*0.35,s*0.5,-s*0.35);
+      break;
+    case 10:
+      noStroke();
+      fill(pick()); rect(0,0,s*0.9,s*0.5,2);
+      fill(30); rect(0,-s*0.35,s*0.6,s*0.35);
+      fill(0); circle(-s*0.3,s*0.35,s*0.3); circle(s*0.3,s*0.35,s*0.3);
+      break;
+    case 11:
+      noStroke();
+      fill(pick()); rect(0,s*0.25,s*0.9,s*0.7);
+      fill(30); triangle(-s*0.5,s*0.25,0,-s*0.5,s*0.5,s*0.25);
+      break;
+  }
+  pop();
 }
