@@ -106,6 +106,7 @@ function draw(){
   } else if(currentStyle === "bangkok"){
     drawBangkok();
   }
+  else if(currentStyle === "ekk"){ drawEkkamai(); }
 }
 
 // ---------- LEH LADAKH ----------
@@ -401,4 +402,92 @@ function drawIcon_BKK(x, y, s, type, pastel) {
     endShape(CLOSE);
   }
   pop();
+}
+
+
+// ---------- EKKAMAI ----------
+function drawEkkamai() {
+  background(245);
+  noStroke();
+
+  // BG split
+  fill(240, 235, 220); rect(0, 0, width, height/2);
+  fill(170, 210, 190); rect(0, height/2, width, height/2);
+
+  // Red vertical circles
+  fill(220, 40, 30);
+  const rx = width * random(0.45, 0.58);
+  let y0 = random(80, 130);
+  const rSize = random(28, 36);
+  const rGap  = random(38, 50);
+  for (let i = 0; i < 3; i++) circle(rx, y0 + i * rGap, rSize);
+
+  // Diamond
+  push();
+  translate(random(width*0.55, width*0.75), random(150, 220));
+  rotate(PI/4);
+  rectMode(CENTER);
+  fill(240, 220, 70); rect(0, 0, 52, 52);
+  fill(100, 200, 220); triangle(0, -26, 26, 0, 0, 0);
+  pop();
+
+  // Black oval
+  fill(20);
+  ellipse(random(width*0.18, width*0.35), random(180, 240),
+          random(90, 110), random(40, 48));
+
+  // Small dots
+  fill(200, 250, 240); circle(random(60, 120), random(120, 180), 16);
+  fill(255); circle(random(360, 440), random(120, 180), 8);
+  fill(0);   circle(random(330, 420), random(150, 190), 4);
+
+  // Target concentric
+  drawTarget_EKK(random(width*0.38, width*0.60), random(260, 340),
+             [color(240), color(190), color(150)], random(54, 64));
+
+  // Dotted V
+  const yMid = height * 0.5;
+  const xL = random(70, 110);
+  const xR = width - xL;
+  const yTop = yMid + random(50, 75);
+  const yBot = yMid + random(135, 165);
+  drawDottedLine_EKK(xL, yTop, width/2, yBot, 9);
+  drawDottedLine_EKK(width/2, yBot, xR, yTop, 9);
+
+  fill(220, 40, 30);
+  circle(xL, yTop, 14);
+  circle(width/2, yBot, 14);
+  circle(xR, yTop, 14);
+
+  // Oval
+  fill(240, 230, 210);
+  ellipse(random(width*0.70, width*0.82),
+          random(yMid+100, yMid+160), 44, 88);
+
+  // misc dots
+  fill(255); circle(random(width*0.50, width*0.62), yMid + random(160, 185), 6);
+  fill(250, 205, 85); circle(random(55, 90), yMid + random(190, 230), 16);
+
+  // Triangle bottom
+  fill(30);
+  triangle(width/2 - 60, height, width/2 + 60, height, width/2, height - 85);
+}
+
+// concentric circles
+function drawTarget_EKK(x, y, cols, rStart) {
+  noStroke();
+  let r = rStart;
+  for (let i = 0; i < cols.length; i++) {
+    fill(cols[i]); circle(x, y, r);
+    r -= rStart / cols.length;
+  }
+}
+
+// dotted line
+function drawDottedLine_EKK(x1, y1, x2, y2, num) {
+  noStroke(); fill(255);
+  for (let i = 0; i <= num; i++) {
+    const t = i / num;
+    circle(lerp(x1, x2, t), lerp(y1, y2, t), 5);
+  }
 }
