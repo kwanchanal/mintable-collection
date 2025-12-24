@@ -108,6 +108,7 @@ function draw(){
   }
   else if(currentStyle === "sukhumvit"){ drawSukhumvit(); }
   else if(currentStyle === "ekk"){ drawEkkamai(); }
+  else if(currentStyle === "chiangmai"){ drawChiangmai(); }
 }
 
 // ---------- LEH LADAKH ----------
@@ -491,6 +492,206 @@ function drawDottedLine_EKK(x1, y1, x2, y2, num) {
     const t = i / num;
     circle(lerp(x1, x2, t), lerp(y1, y2, t), 5);
   }
+}
+
+// ---------- CHIANGMAI ----------
+// Pastel fuzzy gradient flowers (clustered)
+function drawChiangmai() {
+  randomSeed(hashCode(seedStr));
+  noiseSeed(hashCode(seedStr));
+
+  background(252, 246, 238);
+  paperGrain(0.09);
+  paperFibers(1500);
+
+  const palette = [
+    color(244, 170, 176), // pink
+    color(242, 205, 156), // peach
+    color(244, 231, 166), // yellow
+    color(186, 206, 170), // sage
+    color(214, 199, 230), // lavender
+    color(248, 216, 226)  // blush
+  ];
+
+  const bigCount = 12;
+  const smallCount = 20;
+
+  // pick 2-3 cluster centers
+  const centers = [];
+  const k = floor(random(2, 4));
+  for (let i = 0; i < k; i++) {
+    centers.push({
+      x: random(width * 0.25, width * 0.75),
+      y: random(height * 0.25, height * 0.75),
+      s: random(width * 0.12, width * 0.18)
+    });
+  }
+
+  // big flowers: mostly from clusters, some lightly free
+  for (let i = 0; i < bigCount; i++) {
+    const c = random(centers);
+    const useCluster = random() < 0.88;
+
+    const cx = useCluster ? c.x + randomGaussian(0, c.s) : random(width);
+    const cy = useCluster ? c.y + randomGaussian(0, c.s) : random(height);
+
+    const r = random(width * 0.20, width * 0.35);
+    const base = random(palette);
+    drawFlowerGradient(cx, cy, r, base);
+  }
+
+  // small flowers: even tighter around clusters
+  for (let i = 0; i < smallCount; i++) {
+    const c = random(centers);
+    const cx = c.x + randomGaussian(0, c.s * 0.95);
+    const cy = c.y + randomGaussian(0, c.s * 0.95);
+
+    const r = random(width * 0.09, width * 0.18);
+    const base = random(palette);
+    drawFlowerGradient(cx, cy, r, base);
+  }
+
+  softVeil();
+}
+
+// ---------- CHIANGMAI HELPERS ----------
+function drawFlowerGradient(cx, cy, baseR, baseCol) {
+  push();
+  noStroke();
+
+  const centerCol = color(
+    lerp(red(baseCol), 255, 0.10),
+    lerp(green(baseCol), 250, 0.10),
+    lerp(blue(baseCol), 248, 0.10),
+    200
+  );
+  const edgeCol = color(255, 252, 250, 40);
+
+  const petalCount = floor(random(9, 16));
+  for (let p = 0; p < petalCount; p++) {
+    const ang = TWO_PI * (p / petalCount) + random(-0.18, 0.18);
+    const pr  = baseR * random(0.52, 0.82);
+    const dx  = cos(ang) * baseR * random(0.18, 0.42);
+    const dy  = sin(ang) * baseR * random(0.18, 0.42);
+
+    const petalCenter = driftColor(centerCol, 10);
+    stampCloudGradient(cx + dx, cy + dy, pr, petalCenter, edgeCol, 1100);
+  }
+
+  const innerWhiteCenter = color(255, 253, 252, 170);
+  const innerWhiteEdge   = color(255, 253, 252, 20);
+  stampCloudGradient(cx, cy, baseR * random(0.55, 0.75), innerWhiteCenter, innerWhiteEdge, 1300);
+
+  if (random() < 0.65) {
+    const warmA = color(244, 209, 120, 200);
+    const warmB = color(238, 166, 150, 190);
+    const warmBase = random() < 0.6 ? warmA : warmB;
+    const warmCenter = driftColor(warmBase, 8);
+    const warmEdge = color(255, 252, 250, 25);
+
+    stampCloudGradient(
+      cx + random(-baseR * 0.06, baseR * 0.06),
+      cy + random(-baseR * 0.06, baseR * 0.06),
+      baseR * random(0.18, 0.30),
+      warmCenter,
+      warmEdge,
+      780
+    );
+
+    for (let i = 0; i < 26; i++) {
+      fill(255, 255, 255, random(18, 55));
+      const rr = baseR * random(0.010, 0.028);
+      circle(
+        cx + randomGaussian(0, baseR * 0.14),
+        cy + randomGaussian(0, baseR * 0.14),
+        rr * width * 0.0022
+      );
+    }
+  }
+
+  pop();
+}
+
+function stampCloudGradient(cx, cy, r, innerCol, outerCol, n) {
+  const sigma = r * 0.42;
+
+  for (let i = 0; i < n; i++) {
+    const gx = randomGaussian(0, sigma);
+    const gy = randomGaussian(0, sigma);
+
+    const d = dist(0, 0, gx, gy);
+    const t = constrain(d / (r * 1.2), 0, 1);
+
+    const c = lerpColor(innerCol, outerCol, pow(t, 0.85));
+
+    const nn = noise((cx + gx) * 0.0065, (cy + gy) * 0.0065);
+    const centerBoost = (1 - t);
+    const a = (alpha(c) * (0.04 + 0.16 * centerBoost) * (0.85 + 0.35 * nn));
+
+    fill(red(c), green(c), blue(c), a);
+
+    const s = r * random(0.07, 0.21) * (0.40 + 0.95 * centerBoost);
+    ellipse(cx + gx, cy + gy, s, s * random(0.82, 1.20));
+  }
+}
+
+function driftColor(c, amt) {
+  const rr = constrain(red(c) + random(-amt, amt), 0, 255);
+  const gg = constrain(green(c) + random(-amt, amt), 0, 255);
+  const bb = constrain(blue(c) + random(-amt, amt), 0, 255);
+  return color(rr, gg, bb, alpha(c));
+}
+
+function paperGrain(intensity = 0.06) {
+  loadPixels();
+  const d = pixelDensity();
+  const w = width * d;
+  const h = height * d;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = 4 * (y * w + x);
+      const n = noise(x * 0.01, y * 0.01);
+      const speck = (random() < 0.02) ? random(-25, 25) : 0;
+      const delta = (n - 0.5) * 40 * intensity + speck * intensity;
+
+      pixels[idx + 0] = constrain(pixels[idx + 0] + delta, 0, 255);
+      pixels[idx + 1] = constrain(pixels[idx + 1] + delta, 0, 255);
+      pixels[idx + 2] = constrain(pixels[idx + 2] + delta, 0, 255);
+    }
+  }
+  updatePixels();
+}
+
+function paperFibers(count = 1200) {
+  push();
+  stroke(255, 255, 255, 18);
+  strokeWeight(1);
+  for (let i = 0; i < count; i++) {
+    const x = random(width);
+    const y = random(height);
+    const len = random(6, 18);
+    const ang = random(TWO_PI);
+    line(x, y, x + cos(ang) * len, y + sin(ang) * len);
+  }
+
+  stroke(120, 90, 80, 10);
+  for (let i = 0; i < count * 0.35; i++) {
+    const x = random(width);
+    const y = random(height);
+    const len = random(4, 14);
+    const ang = random(TWO_PI);
+    line(x, y, x + cos(ang) * len, y + sin(ang) * len);
+  }
+  pop();
+}
+
+function softVeil() {
+  push();
+  noStroke();
+  fill(255, 250, 245, 24);
+  rect(0, 0, width, height);
+  pop();
 }
 
 

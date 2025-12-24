@@ -57,7 +57,7 @@ The `value="newcollection"` will be the key used in `sketch.js`.
 - In the main `draw()` function, add a case for your new collection:
 
 ```js
-function draw() {
+function draw() {g
   if (CANVAS_TRANSPARENT_BG) { clear(); } else { background(0); }
   if (currentStyle === "leh") {
     drawLeh();
