@@ -2,6 +2,97 @@
 const CANVAS_TRANSPARENT_BG = false;
 
 let seedStr=null,rng,palette,currentStyle=null;
+let renderPhase = "art";
+
+let mgGfx = null;
+let mgCell = 12;
+let mgCols = 0;
+let mgRows = 0;
+let mgGrid = [];
+let mgSeedBase = 0;
+
+const MG_MEADOW_GREENS = [
+  [26, 140, 108],
+  [34, 152, 116],
+  [50, 166, 126],
+  [68, 182, 140],
+  [92, 198, 154],
+  [120, 214, 170],
+  [145, 228, 184],
+];
+
+const MG_DEEP_GREENS = [
+  [16, 105, 82],
+  [20, 116, 90],
+  [24, 126, 96],
+];
+
+const MG_LEAF_GREENS = [
+  [62, 178, 132],
+  [85, 196, 146],
+  [110, 214, 164],
+  [52, 164, 122],
+];
+
+const MG_STEM_GREENS = [
+  [42, 130, 88],
+  [55, 150, 102],
+  [70, 170, 118],
+];
+
+const MG_WHITES = [
+  [252, 251, 248],
+  [248, 246, 240],
+  [244, 242, 234],
+];
+
+const MG_YELLOWS = [
+  [255, 235, 150],
+  [250, 225, 120],
+  [245, 210, 90],
+];
+
+const MG_BLUES = [
+  [120, 160, 235],
+  [150, 185, 255],
+  [95, 135, 210],
+  [70, 115, 190],
+];
+
+const MG_PINKS = [
+  [245, 170, 195],
+  [250, 195, 215],
+  [235, 145, 185],
+];
+
+const MG_REDS = [
+  [230, 60, 85],
+  [200, 35, 60],
+  [245, 85, 105],
+];
+
+const MG_PURPLES = [
+  [170, 150, 235],
+  [200, 180, 255],
+  [140, 120, 210],
+];
+
+const MG_STONE_BASE = [
+  [170, 172, 178],
+  [150, 152, 158],
+  [190, 192, 198],
+  [130, 132, 138],
+];
+
+const MG_STONE_SHADOW = [
+  [110, 112, 118],
+  [120, 122, 128],
+];
+
+const MG_DARKS = [
+  [20, 20, 20],
+  [45, 45, 45],
+];
 
 function seededRandom(){
   let h = 1779033703 ^ seedStr.length;
@@ -62,17 +153,32 @@ function setup(){
 
   initSeed();
 
+  renderPhase = "loading";
+  setTimeout(() => {
+    renderPhase = "art";
+    redraw();
+  }, 0);
+
+  const startRenderCycle = () => {
+    renderPhase = "loading";
+    redraw();
+    setTimeout(() => {
+      renderPhase = "art";
+      redraw();
+    }, 0);
+  };
+
   document.getElementById("regen").addEventListener("click",()=>{
     const newSeed = (Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36));
     initSeed(newSeed);
-    redraw();
+    startRenderCycle();
     updateURLSeed(newSeed);
   });
   document.getElementById("applySeed").addEventListener("click",()=>{
     const v = document.getElementById("seed").value.trim();
     if(v){
       initSeed(v);
-      redraw();
+      startRenderCycle();
       updateURLSeed(v);
     }
   });
@@ -81,7 +187,7 @@ function setup(){
   });
   document.getElementById("styleSelect").addEventListener("change",e=>{
     currentStyle = e.target.value;
-    redraw();
+    startRenderCycle();
   });
 }
 
@@ -97,7 +203,23 @@ function updateURLSeed(v=seedStr){
   history.replaceState({}, "", url);
 }
 
+function drawLoading(){
+  if(CANVAS_TRANSPARENT_BG){ clear(); } else { background(0); }
+  push();
+  textAlign(CENTER, CENTER);
+  textFont("IBM Plex Mono");
+  textSize(16);
+  textStyle(BOLD);
+  fill(230, 230, 236);
+  text("💭 Loading", width / 2, height / 2);
+  pop();
+}
+
 function draw(){
+  if (renderPhase === "loading") {
+    drawLoading();
+    return;
+  }
   if(CANVAS_TRANSPARENT_BG){ clear(); } else { background(0); }
   if(currentStyle === "leh"){
     drawLeh();
@@ -106,6 +228,7 @@ function draw(){
   } else if(currentStyle === "bangkok"){
     drawBangkok();
   }
+  else if(currentStyle === "mario garden"){ drawMarioGarden(); }
   else if(currentStyle === "sukhumvit"){ drawSukhumvit(); }
   else if(currentStyle === "ekk"){ drawEkkamai(); }
   else if(currentStyle === "chiangmai"){ drawChiangmai(); }
@@ -694,6 +817,527 @@ function softVeil() {
   pop();
 }
 
+
+// ---------- MARIO GARDEN ----------
+const MG_X_ALPHA = 55;
+const MG_X_CONTRAST = 0.10;
+const MG_GRID_ALPHA = 16;
+
+const MG_LEAF_PATCHES = 34;
+const MG_STONE_PATHS = 3;
+const MG_STONE_PEBBLES = 12;
+
+const MG_BIG_FLOWERS = 8;
+const MG_MID_FLOWERS = 16;
+const MG_TINY_FLOWERS = 140;
+const MG_SPRITE_FLOWERS = 160;
+
+const MG_BUTTERFLIES = [5, 8];
+const MG_LADYBUGS = [1, 2];
+
+function drawMarioGarden() {
+  const base = int(hashCode(seedStr) & 0x7fffffff);
+  mgSeedBase = base;
+  randomSeed(base);
+  noiseSeed(base);
+
+  mgCell = Math.max(8, Math.floor(width / 80));
+  mgCols = Math.max(10, Math.ceil(width / mgCell));
+  mgRows = Math.max(10, Math.ceil(height / mgCell));
+
+  const w = mgCols * mgCell;
+  const h = mgRows * mgCell;
+  if (!mgGfx || mgGfx.width !== w || mgGfx.height !== h) {
+    mgGfx = createGraphics(w, h);
+    mgGfx.pixelDensity(1);
+  }
+
+  mgGrid = Array.from({ length: mgCols }, () => Array(mgRows).fill(color(0)));
+
+  mgPaintMeadowMultiGreen();
+  mgAddMeadowTexture();
+
+  for (let i = 0; i < MG_LEAF_PATCHES; i++) {
+    const cx = floor(random(mgCols));
+    const cy = floor(random(mgRows));
+    const r = floor(random(6, 14));
+    mgBlobMix(cx, cy, r, mgRgb(mgPick(MG_LEAF_GREENS)), 0.26);
+
+    if (random() < 0.65) {
+      mgBlobMix(
+        cx + floor(random(-6, 6)),
+        cy + floor(random(-6, 6)),
+        floor(r * 0.7),
+        mgRgb(mgPick(MG_DEEP_GREENS)),
+        0.16
+      );
+    }
+  }
+
+  for (let p = 0; p < MG_STONE_PATHS; p++) mgPaintStonePath();
+  for (let i = 0; i < MG_STONE_PEBBLES; i++) {
+    const cx = floor(random(mgCols));
+    const cy = floor(random(mgRows));
+    mgPaintStoneBlob(cx, cy, floor(random(4, 8)));
+  }
+
+  for (let i = 0; i < MG_BIG_FLOWERS; i++) {
+    const cx = floor(random(10, mgCols - 10));
+    const cy = floor(random(10, mgRows - 10));
+    mgDrawRosette(cx, cy, floor(random(6, 9)), mgPickFlowerPalette(), true);
+  }
+  for (let i = 0; i < MG_MID_FLOWERS; i++) {
+    const cx = floor(random(8, mgCols - 8));
+    const cy = floor(random(8, mgRows - 8));
+    mgDrawRosette(cx, cy, floor(random(4, 6)), mgPickFlowerPalette(), false);
+  }
+
+  for (let i = 0; i < MG_SPRITE_FLOWERS; i++) {
+    const cx = floor(random(5, mgCols - 5));
+    const cy = floor(random(6, mgRows - 6));
+    mgDrawPixelFlowerIcon(cx, cy);
+  }
+
+  for (let i = 0; i < MG_TINY_FLOWERS; i++) {
+    const cx = floor(random(4, mgCols - 4));
+    const cy = floor(random(4, mgRows - 4));
+    if (random() < 0.82) mgDrawTinyWhite(cx, cy);
+  }
+
+  mgAddCritters();
+  mgRenderToGfx();
+
+  background(230);
+  image(mgGfx, 0, 0, width, height);
+}
+
+function mgPaintMeadowMultiGreen() {
+  for (let y = 0; y < mgRows; y++) {
+    for (let x = 0; x < mgCols; x++) {
+      const n1 = noise(x * 0.08, y * 0.08);
+      const n2 = noise(100 + x * 0.18, 100 + y * 0.18);
+      const n3 = noise(300 + x * 0.03, 300 + y * 0.03);
+
+      const t = mgClamp01(n1 * 0.55 + n2 * 0.30 + n3 * 0.15);
+
+      const a = mgRgb(mgPick(MG_MEADOW_GREENS));
+      const b = mgRgb(mgPick(MG_MEADOW_GREENS));
+      let c = mgMix(a, b, t);
+
+      c = mgMix(c, color(255), 0.10);
+
+      const v = (n2 * 10 - 5);
+      mgGrid[x][y] = color(
+        mgClamp(red(c) + v),
+        mgClamp(green(c) + v),
+        mgClamp(blue(c) + v)
+      );
+    }
+  }
+}
+
+function mgAddMeadowTexture() {
+  const patches = mgCols * 11;
+  for (let i = 0; i < patches; i++) {
+    const cx = floor(random(mgCols));
+    const cy = floor(random(mgRows));
+    const r = floor(random(3, 10));
+
+    const c = random() < 0.72 ? mgRgb(mgPick(MG_MEADOW_GREENS)) : mgRgb(mgPick(MG_DEEP_GREENS));
+    const strength = random() < 0.7 ? 0.18 : 0.12;
+
+    mgBlobMix(cx, cy, r, c, strength);
+  }
+}
+
+function mgPaintStonePath() {
+  let x = random(mgCols);
+  let y = random(mgRows);
+
+  const ang = random(TWO_PI);
+  const dx0 = cos(ang);
+  const dy0 = sin(ang);
+
+  const steps = floor(random(mgCols * 0.9, mgCols * 1.3));
+  for (let i = 0; i < steps; i++) {
+    const wobble = noise(900 + i * 0.06, mgSeedBase * 0.000001) * 2 - 1;
+    const dx = dx0 + wobble * 0.35;
+    const dy = dy0 - wobble * 0.35;
+
+    x += dx;
+    y += dy;
+
+    if (x < 2 || x > mgCols - 3 || y < 2 || y > mgRows - 3) break;
+
+    if (random() < 0.85) mgPaintStoneBlob(floor(x), floor(y), floor(random(3, 5)));
+  }
+}
+
+function mgPaintStoneBlob(cx, cy, r) {
+  const base = mgRgb(mgPick(MG_STONE_BASE));
+  const hi = mgMix(base, color(255), 0.18);
+  const sh = mgMix(base, mgRgb(mgPick(MG_STONE_SHADOW)), 0.35);
+
+  for (let y = cy - r; y <= cy + r; y++) {
+    for (let x = cx - r; x <= cx + r; x++) {
+      if (!mgInBounds(x, y)) continue;
+      const d = dist(x, y, cx, cy) / r;
+      if (d > 1) continue;
+
+      const lx = (x - cx);
+      const ly = (y - cy);
+      let c = base;
+      if (lx + ly < -0.2) c = hi;
+      if (lx + ly > 0.8) c = sh;
+
+      mgGrid[x][y] = mgMix(mgGrid[x][y], c, 0.78 * (1 - d * 0.35));
+    }
+  }
+
+  if (random() < 0.35) {
+    const k = mgMix(base, color(0), 0.25);
+    mgSetCellBlend(cx, cy, k, 0.28);
+    if (random() < 0.5) mgSetCellBlend(cx + 1, cy, k, 0.20);
+  }
+}
+
+function mgPickFlowerPalette() {
+  const r = random();
+  if (r < 0.28) return { petal: mgRgb(mgPick(MG_BLUES)),   accent: mgRgb(mgPick(MG_PURPLES)), core: mgRgb(mgPick(MG_YELLOWS)) };
+  if (r < 0.52) return { petal: mgRgb(mgPick(MG_PINKS)),   accent: mgRgb(mgPick(MG_PURPLES)), core: mgRgb(mgPick(MG_YELLOWS)) };
+  if (r < 0.76) return { petal: mgRgb(mgPick(MG_REDS)),    accent: mgRgb(mgPick(MG_PINKS)),   core: mgRgb(mgPick(MG_YELLOWS)) };
+  return             { petal: mgRgb(mgPick(MG_PURPLES)), accent: mgRgb(mgPick(MG_BLUES)),    core: mgRgb(mgPick(MG_YELLOWS)) };
+}
+
+function mgDrawRosette(cx, cy, radius, pal, isBig) {
+  const pet = pal.petal;
+  const hi = mgMix(pet, color(255), 0.22);
+  const sh = mgMix(pet, color(0), 0.12);
+
+  const acc = pal.accent;
+  const accHi = mgMix(acc, color(255), 0.18);
+  const accSh = mgMix(acc, color(0), 0.10);
+
+  const core = pal.core;
+
+  const ring1 = radius;
+  const ring2 = max(2, floor(radius * 0.65));
+  const ring3 = max(1, floor(radius * 0.35));
+
+  if (isBig && random() < 0.95) {
+    const leaf = mgRgb(mgPick(MG_LEAF_GREENS));
+    mgBlobMix(cx + floor(random(-2, 2)), cy + floor(random(-2, 2)), radius + 3, leaf, 0.12);
+  }
+
+  mgRosetteRing(cx, cy, ring1, pet, hi, sh);
+  mgRosetteRing(cx, cy, ring2, acc, accHi, accSh);
+  mgRosetteRing(cx, cy, ring3, mgMix(pet, color(255), 0.12), mgMix(pet, color(255), 0.25), mgMix(pet, color(0), 0.08));
+
+  mgStampBlend(cx, cy, [
+    {dx:0,dy:0,c:core},
+    {dx:1,dy:0,c:mgMix(core,color(255),0.12)},
+    {dx:-1,dy:0,c:mgMix(core,color(255),0.08)},
+    {dx:0,dy:1,c:mgMix(core,color(0),0.10)},
+    {dx:0,dy:-1,c:mgMix(core,color(255),0.08)},
+  ], 0.92);
+
+  if (random() < 0.45) {
+    const w = mgRgb(mgPick(MG_WHITES));
+    mgSetCellBlend(cx + floor(random(-ring1, ring1)), cy + floor(random(-ring1, ring1)), w, 0.22);
+  }
+}
+
+function mgRosetteRing(cx, cy, r, base, hi, sh) {
+  const pts = [
+    [ r,  0], [-r,  0], [ 0,  r], [ 0, -r],
+    [ r-1,  r-1], [-(r-1),  r-1], [ r-1, -(r-1)], [-(r-1), -(r-1)],
+  ];
+
+  for (const [dx, dy] of pts) mgSetCellBlend(cx + dx, cy + dy, base, 0.92);
+
+  for (const [dx, dy] of pts) {
+    const ax = cx + dx;
+    const ay = cy + dy;
+    mgSetCellBlend(ax + mgSign(dx), ay, hi, 0.72);
+    mgSetCellBlend(ax, ay + mgSign(dy), hi, 0.72);
+    mgSetCellBlend(ax - mgSign(dx), ay, sh, 0.52);
+    mgSetCellBlend(ax, ay - mgSign(dy), sh, 0.52);
+  }
+
+  for (let a = 0; a < TWO_PI; a += TWO_PI / 16) {
+    const x = cx + round(cos(a) * r);
+    const y = cy + round(sin(a) * r);
+    mgSetCellBlend(x, y, mgMix(base, hi, 0.25), 0.68);
+  }
+}
+
+function mgDrawTinyWhite(cx, cy) {
+  const w = mgRgb(mgPick(MG_WHITES));
+  const y = mgRgb(mgPick(MG_YELLOWS));
+  mgStampBlend(cx, cy, [
+    {dx:0,dy:0,c:y},
+    {dx:1,dy:0,c:w},{dx:-1,dy:0,c:w},{dx:0,dy:1,c:w},{dx:0,dy:-1,c:w},
+  ], 0.90);
+}
+
+function mgDrawPixelFlowerIcon(cx, cy) {
+  const typeRoll = random();
+  let type = "YELLOW";
+  if (typeRoll < 0.22) type = "YELLOW";
+  else if (typeRoll < 0.44) type = "PINK";
+  else if (typeRoll < 0.62) type = "RED";
+  else if (typeRoll < 0.78) type = "PURPLE";
+  else type = "BLUE_SPRIG";
+
+  if (random() < 0.25) {
+    const c = mgGrid[cx][cy];
+    if (red(c) > 140 && green(c) > 140 && blue(c) > 140) return;
+  }
+
+  const stem = mgRgb(mgPick(MG_STEM_GREENS));
+  const stem2 = mgMix(stem, color(0), 0.10);
+  const leaf = mgMix(stem, color(255), 0.12);
+
+  const stemLen = floor(random(3, 6));
+  for (let i = 0; i < stemLen; i++) {
+    mgSetCellBlend(cx, cy + 2 + i, mgMix(stem, stem2, i / max(1, stemLen - 1)), 0.92);
+  }
+
+  if (random() < 0.85) mgSetCellBlend(cx - 1, cy + 3 + floor(stemLen * 0.4), leaf, 0.88);
+  if (random() < 0.85) mgSetCellBlend(cx + 1, cy + 4 + floor(stemLen * 0.55), leaf, 0.88);
+
+  if (type === "BLUE_SPRIG") {
+    const b1 = mgRgb(mgPick(MG_BLUES));
+    const b2 = mgMix(b1, color(255), 0.18);
+    const y = mgRgb(mgPick(MG_YELLOWS));
+
+    mgSetCellBlend(cx,     cy + 1, stem2, 0.92);
+    mgSetCellBlend(cx + 1, cy,     stem2, 0.88);
+    mgSetCellBlend(cx + 2, cy - 1, stem2, 0.82);
+
+    mgStampBlend(cx, cy, [
+      {dx:-1,dy:0,c:b1},{dx:0,dy:0,c:b2},{dx:1,dy:0,c:b1},
+      {dx:0,dy:-1,c:b2},{dx:2,dy:-1,c:b1},{dx:3,dy:-2,c:b2},
+      {dx:2,dy:0,c:b2},
+    ], 0.92);
+
+    if (random() < 0.6) mgSetCellBlend(cx + 1, cy - 1, y, 0.60);
+    return;
+  }
+
+  let pet, petHi, core;
+  if (type === "YELLOW") {
+    pet = color(245, 190, 55);
+    petHi = mgMix(pet, color(255), 0.22);
+    core = mgMix(mgRgb(mgPick(MG_YELLOWS)), color(255), 0.08);
+  } else if (type === "PINK") {
+    pet = mgRgb(mgPick(MG_PINKS));
+    petHi = mgMix(pet, color(255), 0.22);
+    core = mgMix(mgRgb(mgPick(MG_YELLOWS)), color(255), 0.10);
+  } else if (type === "RED") {
+    pet = mgRgb(mgPick(MG_REDS));
+    petHi = mgMix(pet, color(255), 0.16);
+    core = mgMix(mgRgb(mgPick(MG_YELLOWS)), color(0), 0.05);
+  } else {
+    pet = mgRgb(mgPick(MG_PURPLES));
+    petHi = mgMix(pet, color(255), 0.22);
+    core = mgMix(mgRgb(mgPick(MG_YELLOWS)), color(255), 0.06);
+  }
+
+  const shapeRoll = random();
+  if (shapeRoll < 0.55) {
+    mgStampBlend(cx, cy, [
+      {dx:0,dy:0,c:pet},
+      {dx:-1,dy:0,c:petHi},
+      {dx:1,dy:0,c:pet},
+      {dx:0,dy:-1,c:petHi},
+    ], 0.94);
+    mgSetCellBlend(cx, cy + 1, pet, 0.70);
+  } else {
+    mgStampBlend(cx, cy, [
+      {dx:0,dy:0,c:core},
+      {dx:-1,dy:0,c:pet},{dx:1,dy:0,c:pet},
+      {dx:0,dy:-1,c:petHi},{dx:0,dy:1,c:pet},
+      {dx:-1,dy:-1,c:petHi},{dx:1,dy:-1,c:petHi},
+    ], 0.93);
+  }
+}
+
+function mgAddCritters() {
+  const bCount = floor(random(MG_BUTTERFLIES[0], MG_BUTTERFLIES[1] + 1));
+  for (let i = 0; i < bCount; i++) {
+    const x = floor(random(8, mgCols - 8));
+    const y = floor(random(8, mgRows - 8));
+    mgDrawButterfly(x, y);
+  }
+
+  const lCount = floor(random(MG_LADYBUGS[0], MG_LADYBUGS[1] + 1));
+  for (let i = 0; i < lCount; i++) {
+    const x = floor(random(4, mgCols - 4));
+    const y = floor(random(4, mgRows - 4));
+    mgDrawLadybug3x3LongLegs(x, y);
+  }
+}
+
+function mgDrawButterfly(cx, cy) {
+  const body = mgRgb(mgPick(MG_DARKS));
+  const wing = random() < 0.5 ? mgRgb(mgPick(MG_BLUES)) : mgRgb(mgPick(MG_PINKS));
+  const wing2 = mgMix(wing, color(255), 0.20);
+
+  mgStampBlend(cx, cy, [
+    {dx:-3,dy:-1,c:wing},{dx:-2,dy:-2,c:wing},{dx:-2,dy:-1,c:wing2},{dx:-2,dy:0,c:wing},
+    {dx:-1,dy:-2,c:wing2},{dx:-1,dy:-1,c:wing},{dx:-1,dy:0,c:wing2},{dx:-1,dy:1,c:wing},
+    {dx: 3,dy:-1,c:wing},{dx: 2,dy:-2,c:wing},{dx: 2,dy:-1,c:wing2},{dx: 2,dy:0,c:wing},
+    {dx: 1,dy:-2,c:wing2},{dx: 1,dy:-1,c:wing},{dx: 1,dy:0,c:wing2},{dx: 1,dy:1,c:wing},
+    {dx:0,dy:-1,c:body},{dx:0,dy:0,c:body},{dx:0,dy:1,c:body},
+  ], 0.92);
+
+  mgSetCellBlend(cx - 1, cy - 3, body, 0.35);
+  mgSetCellBlend(cx + 1, cy - 3, body, 0.35);
+}
+
+function mgDrawLadybug3x3LongLegs(cx, cy) {
+  const r = color(220, 35, 55);
+  const rh = mgMix(r, color(255), 0.14);
+  const k = color(20, 20, 20);
+
+  mgSetCellBlend(cx - 1, cy - 1, rh, 0.92);
+  mgSetCellBlend(cx,     cy - 1, k,  0.92);
+  mgSetCellBlend(cx + 1, cy - 1, rh, 0.92);
+
+  mgSetCellBlend(cx - 1, cy,     r,  0.92);
+  mgSetCellBlend(cx,     cy,     k,  0.92);
+  mgSetCellBlend(cx + 1, cy,     r,  0.92);
+
+  mgSetCellBlend(cx - 1, cy + 1, r,  0.92);
+  mgSetCellBlend(cx,     cy + 1, r,  0.92);
+  mgSetCellBlend(cx + 1, cy + 1, r,  0.92);
+
+  if (random() < 0.35) mgSetCellBlend(cx - 1, cy + 1, k, 0.70);
+  if (random() < 0.35) mgSetCellBlend(cx + 1, cy + 1, k, 0.70);
+
+  const legA = 0.78;
+
+  mgSetCellBlend(cx - 2, cy - 1, k, legA);
+  mgSetCellBlend(cx - 3, cy - 2, k, 0.55);
+  mgSetCellBlend(cx - 4, cy - 3, k, 0.35);
+
+  mgSetCellBlend(cx - 2, cy,     k, legA);
+  mgSetCellBlend(cx - 3, cy,     k, 0.55);
+  mgSetCellBlend(cx - 4, cy + 1, k, 0.35);
+
+  mgSetCellBlend(cx - 2, cy + 1, k, legA);
+  mgSetCellBlend(cx - 3, cy + 2, k, 0.55);
+  mgSetCellBlend(cx - 4, cy + 3, k, 0.35);
+
+  mgSetCellBlend(cx + 2, cy - 1, k, legA);
+  mgSetCellBlend(cx + 3, cy - 2, k, 0.55);
+  mgSetCellBlend(cx + 4, cy - 3, k, 0.35);
+
+  mgSetCellBlend(cx + 2, cy,     k, legA);
+  mgSetCellBlend(cx + 3, cy,     k, 0.55);
+  mgSetCellBlend(cx + 4, cy + 1, k, 0.35);
+
+  mgSetCellBlend(cx + 2, cy + 1, k, legA);
+  mgSetCellBlend(cx + 3, cy + 2, k, 0.55);
+  mgSetCellBlend(cx + 4, cy + 3, k, 0.35);
+
+  if (random() < 0.7) {
+    mgSetCellBlend(cx - 1, cy - 2, k, 0.45);
+    mgSetCellBlend(cx - 2, cy - 3, k, 0.28);
+  }
+  if (random() < 0.7) {
+    mgSetCellBlend(cx + 1, cy - 2, k, 0.45);
+    mgSetCellBlend(cx + 2, cy - 3, k, 0.28);
+  }
+}
+
+function mgRenderToGfx() {
+  mgGfx.clear();
+  mgGfx.noStroke();
+
+  for (let y = 0; y < mgRows; y++) {
+    for (let x = 0; x < mgCols; x++) {
+      mgGfx.fill(mgGrid[x][y]);
+      mgGfx.rect(x * mgCell, y * mgCell, mgCell, mgCell);
+    }
+  }
+
+  mgGfx.strokeWeight(1);
+  for (let y = 0; y < mgRows; y++) {
+    for (let x = 0; x < mgCols; x++) {
+      const c = mgGrid[x][y];
+      const d1 = mgDarker(c, MG_X_CONTRAST);
+      const d2 = mgLighter(c, MG_X_CONTRAST);
+      d1.setAlpha(MG_X_ALPHA);
+      d2.setAlpha(MG_X_ALPHA);
+
+      const px = x * mgCell;
+      const py = y * mgCell;
+
+      mgGfx.stroke(d1);
+      mgGfx.line(px + 2, py + 2, px + mgCell - 2, py + mgCell - 2);
+
+      mgGfx.stroke(d2);
+      mgGfx.line(px + mgCell - 2, py + 2, px + 2, py + mgCell - 2);
+    }
+  }
+
+  mgGfx.strokeWeight(1);
+  mgGfx.stroke(0, MG_GRID_ALPHA);
+  for (let x = 0; x <= mgCols; x++) mgGfx.line(x * mgCell, 0, x * mgCell, mgRows * mgCell);
+  for (let y = 0; y <= mgRows; y++) mgGfx.line(0, y * mgCell, mgCols * mgCell, y * mgCell);
+}
+
+function mgBlobMix(cx, cy, r, colr, strength) {
+  for (let y = cy - r; y <= cy + r; y++) {
+    for (let x = cx - r; x <= cx + r; x++) {
+      if (!mgInBounds(x, y)) continue;
+      const d = dist(x, y, cx, cy) / r;
+      if (d > 1) continue;
+      const t = strength * (1 - d);
+      mgGrid[x][y] = mgMix(mgGrid[x][y], colr, t);
+    }
+  }
+}
+
+function mgStampBlend(cx, cy, pts, alphaMix) {
+  for (const p of pts) {
+    const x = cx + p.dx;
+    const y = cy + p.dy;
+    if (!mgInBounds(x, y)) continue;
+    mgGrid[x][y] = mgMix(mgGrid[x][y], p.c, alphaMix);
+  }
+}
+
+function mgSetCellBlend(x, y, c, t) {
+  if (!mgInBounds(x, y)) return;
+  mgGrid[x][y] = mgMix(mgGrid[x][y], c, t);
+}
+
+function mgInBounds(x, y) {
+  return x >= 0 && x < mgCols && y >= 0 && y < mgRows;
+}
+
+function mgPick(arr, a = 0, b = null) {
+  const hi = (b === null) ? arr.length - 1 : b;
+  return arr[floor(random(a, hi + 1))];
+}
+
+function mgRgb(a) { return color(a[0], a[1], a[2]); }
+function mgClamp(v) { return max(0, min(255, v)); }
+function mgClamp01(v) { return max(0, min(1, v)); }
+function mgSign(v) { return v === 0 ? 0 : (v > 0 ? 1 : -1); }
+
+function mgMix(c1, c2, t) {
+  return color(
+    lerp(red(c1), red(c2), t),
+    lerp(green(c1), green(c2), t),
+    lerp(blue(c1), blue(c2), t)
+  );
+}
+function mgDarker(c, t) { return mgMix(c, color(0), t); }
+function mgLighter(c, t) { return mgMix(c, color(255), t); }
 
 // ---------- SUKHUMVIT ----------
 // Abstract City Map (random on click)
